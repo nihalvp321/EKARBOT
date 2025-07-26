@@ -1,0 +1,69 @@
+import * as React from 'react';
+import { useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { useDeveloperAuth } from '@/hooks/useDeveloperAuth';
+
+interface Message {
+  id: string;
+  sender_id: string;
+  receiver_id: string;
+  message_text: string;
+  is_read: boolean;
+  created_at: string;
+  attachment_url?: string;
+  attachment_type?: string;
+  attachment_name?: string;
+  attachment_size?: number;
+  sender?: {
+    username: string;
+    user_type: string;
+  };
+}
+
+interface Contact {
+  id: string;
+  username: string;
+  user_type: string;
+  email: string;
+  unreadCount?: number;
+}
+
+export const useDeveloperRealtimeMessages = (
+  selectedContact: Contact | null,
+  setMessages: React.Dispatch<React.SetStateAction<Message[]>>
+) => {
+  const { user } = useDeveloperAuth();
+
+  useEffect(() => {
+    if (!selectedContact || !user) return;
+
+    const channel = supabase
+      .channel('messages-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+          filter: `or(and(sender_id.eq.${selectedContact.id},receiver_id.eq.${user.id}),and(sender_id.eq.${user.id},receiver_id.eq.${selectedContact.id}))`
+        },
+        (payload) => {
+          const newMessage = payload.new as Message;
+          setMessages(prev => [...prev, newMessage]);
+          
+          // Mark as read if we're the receiver
+          if (newMessage.receiver_id === user.id) {
+            supabase
+              .from('messages')
+              .update({ is_read: true })
+              .eq('id', newMessage.id);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [selectedContact, user, setMessages]);
+};

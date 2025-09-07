@@ -1,6 +1,9 @@
+
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Plus, X } from 'lucide-react';
 
 interface ContactInfo {
   name: string;
@@ -9,61 +12,106 @@ interface ContactInfo {
 }
 
 interface ProjectContactInfoProps {
-  formData: { contacts: ContactInfo[] };
+  formData: any;
   handleInputChange: (field: string, value: ContactInfo[]) => void;
 }
 
 const ProjectContactInfo = ({ formData, handleInputChange }: ProjectContactInfoProps) => {
-  const contact: ContactInfo = formData.contacts?.[0] || { name: '', phone: '', email: '' };
+  // Ensure contacts is always an array
+  const contacts = Array.isArray(formData.contacts) 
+    ? formData.contacts 
+    : [{ name: '', phone: '', email: '' }];
 
-  const updateContact = (field: keyof ContactInfo, value: string) => {
-    const updatedContact = { ...contact, [field]: value };
-    handleInputChange('contacts', [updatedContact]); // Always update as array with single object
+  const updateContact = (index: number, field: keyof ContactInfo, value: string) => {
+    const updatedContacts = [...contacts];
+    updatedContacts[index] = { ...updatedContacts[index], [field]: value };
+    handleInputChange('contacts', updatedContacts);
+  };
+
+  const addContact = () => {
+    const updatedContacts = [...contacts, { name: '', phone: '', email: '' }];
+    handleInputChange('contacts', updatedContacts);
+  };
+
+  const removeContact = (index: number) => {
+    if (contacts.length > 1) {
+      const updatedContacts = contacts.filter((_: ContactInfo, i: number) => i !== index);
+      handleInputChange('contacts', updatedContacts);
+    }
   };
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-lg font-semibold text-gray-800">Sales Contact Details</CardTitle>
+        <div className="flex justify-between items-center">
+          <CardTitle className="text-lg font-semibold text-gray-800">Sales Contact Details</CardTitle>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={addContact}
+            className="flex items-center gap-2"
+          >
+            <Plus className="h-4 w-4" />
+            Add Contact
+          </Button>
+        </div>
       </CardHeader>
       <CardContent className="space-y-6">
-        <div className="space-y-4 p-4 border rounded-lg">
-          <div>
-            <Label htmlFor="contact_name">Contact Name *</Label>
-            <Input
-              id="contact_name"
-              value={contact.name}
-              onChange={(e) => updateContact('name', e.target.value)}
-              placeholder="John Smith"
-              required
-            />
-          </div>
+        {contacts.map((contact: ContactInfo, index: number) => (
+          <div key={index} className="space-y-4 p-4 border rounded-lg relative">
+            <div className="flex justify-between items-center">
+              <h4 className="font-medium text-gray-700">Contact {index + 1}</h4>
+              {contacts.length > 1 && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => removeContact(index)}
+                  className="text-red-600 hover:text-red-700"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
+            
+            <div>
+              <Label htmlFor={`contact_name_${index}`}>Contact Name *</Label>
+              <Input
+                id={`contact_name_${index}`}
+                value={contact.name}
+                onChange={(e) => updateContact(index, 'name', e.target.value)}
+                placeholder="John Smith"
+                required
+              />
+            </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="contact_phone">Phone Number *</Label>
-              <Input
-                id="contact_phone"
-                type="tel"
-                value={contact.phone}
-                onChange={(e) => updateContact('phone', e.target.value)}
-                placeholder="+971 50 123 4567"
-                required
-              />
-            </div>
-            <div>
-              <Label htmlFor="contact_email">Email *</Label>
-              <Input
-                id="contact_email"
-                type="email"
-                value={contact.email}
-                onChange={(e) => updateContact('email', e.target.value)}
-                placeholder="sales@developer.com"
-                required
-              />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor={`contact_phone_${index}`}>Phone Number *</Label>
+                <Input
+                  id={`contact_phone_${index}`}
+                  type="tel"
+                  value={contact.phone}
+                  onChange={(e) => updateContact(index, 'phone', e.target.value)}
+                  placeholder="+971 50 123 4567"
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor={`contact_email_${index}`}>Email *</Label>
+                <Input
+                  id={`contact_email_${index}`}
+                  type="email"
+                  value={contact.email}
+                  onChange={(e) => updateContact(index, 'email', e.target.value)}
+                  placeholder="sales@developer.com"
+                  required
+                />
+              </div>
             </div>
           </div>
-        </div>
+        ))}
       </CardContent>
     </Card>
   );

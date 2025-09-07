@@ -1,8 +1,10 @@
+
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useDropdownOptions } from '@/components/hooks/useDropdownOptions';
 
 interface ProjectBasicInfoProps {
   formData: any;
@@ -10,6 +12,10 @@ interface ProjectBasicInfoProps {
 }
 
 const ProjectBasicInfo = ({ formData, handleInputChange }: ProjectBasicInfoProps) => {
+  const { options: projectTypeOptions } = useDropdownOptions('project_type');
+  const { options: listingTypeOptions } = useDropdownOptions('listing_type');
+  const { options: projectStatusOptions } = useDropdownOptions('project_status');
+
   return (
     <Card>
       <CardHeader>
@@ -58,13 +64,12 @@ const ProjectBasicInfo = ({ formData, handleInputChange }: ProjectBasicInfoProps
               <SelectTrigger>
                 <SelectValue placeholder="Select type" />
               </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Apartment">Apartment</SelectItem>
-                <SelectItem value="Villa">Villa</SelectItem>
-                <SelectItem value="Townhouse">Townhouse</SelectItem>
-                <SelectItem value="Plot">Plot</SelectItem>
-                <SelectItem value="Office">Office</SelectItem>
-                <SelectItem value="Retail">Retail</SelectItem>
+              <SelectContent className="bg-white border shadow-lg z-50">
+                {projectTypeOptions.map((option) => (
+                  <SelectItem key={option.id} value={option.value}>
+                    {option.value}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -74,9 +79,12 @@ const ProjectBasicInfo = ({ formData, handleInputChange }: ProjectBasicInfoProps
               <SelectTrigger>
                 <SelectValue placeholder="Select listing type" />
               </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Sale">Sale</SelectItem>
-                <SelectItem value="Rent">Rent</SelectItem>
+              <SelectContent className="bg-white border shadow-lg z-50">
+                {listingTypeOptions.map((option) => (
+                  <SelectItem key={option.id} value={option.value}>
+                    {option.value}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -86,10 +94,12 @@ const ProjectBasicInfo = ({ formData, handleInputChange }: ProjectBasicInfoProps
               <SelectTrigger>
                 <SelectValue placeholder="Select status" />
               </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Off-plan">Off-plan</SelectItem>
-                <SelectItem value="Under Construction">Under Construction</SelectItem>
-                <SelectItem value="Ready">Ready</SelectItem>
+              <SelectContent className="bg-white border shadow-lg z-50">
+                {projectStatusOptions.map((option) => (
+                  <SelectItem key={option.id} value={option.value}>
+                    {option.value}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>

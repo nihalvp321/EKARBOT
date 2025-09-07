@@ -1,4 +1,4 @@
-import * as React from 'react';
+
 import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -9,6 +9,7 @@ import { Camera, Save, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useDeveloperAuth } from '@/hooks/useDeveloperAuth';
+// Removed password change functionality for security
 
 interface DeveloperProfileModalProps {
   open: boolean;
@@ -19,6 +20,7 @@ const DeveloperProfileModal = ({ open, onClose }: DeveloperProfileModalProps) =>
   const { user, profile, refreshProfile } = useDeveloperAuth();
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
+  // Removed password change state for security
   const [formData, setFormData] = useState({
     developer_name: '',
     contact_number: '',
@@ -113,6 +115,33 @@ const DeveloperProfileModal = ({ open, onClose }: DeveloperProfileModalProps) =>
     }
   };
 
+  const handleRemoveImage = async () => {
+    if (!user || !profile) return;
+
+    setUploading(true);
+    try {
+      // Update the developer profile to remove the image URL
+      const { error: updateError } = await supabase
+        .from('developers')
+        .update({ profile_image_url: null })
+        .eq('user_id', user.id);
+
+      if (updateError) {
+        console.error('Error removing profile image:', updateError);
+        throw updateError;
+      }
+
+      // Refresh the profile data
+      await refreshProfile();
+      toast.success('Profile image removed successfully');
+    } catch (error) {
+      console.error('Error removing image:', error);
+      toast.error('Failed to remove image. Please try again.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const handleSave = async () => {
     if (!user) return;
 
@@ -192,6 +221,17 @@ const DeveloperProfileModal = ({ open, onClose }: DeveloperProfileModalProps) =>
             {uploading && (
               <p className="text-sm text-gray-500">Uploading image...</p>
             )}
+            {profile?.profile_image_url && (
+              <Button
+                onClick={handleRemoveImage}
+                variant="outline"
+                size="sm"
+                disabled={uploading}
+                className="text-red-600 hover:text-red-700 border-red-200 hover:border-red-300"
+              >
+                Remove Image
+              </Button>
+            )}
           </div>
 
           {/* Form Fields */}
@@ -249,7 +289,7 @@ const DeveloperProfileModal = ({ open, onClose }: DeveloperProfileModalProps) =>
           </div>
 
           {/* Action Buttons */}
-          <div className="flex gap-3 pt-4">
+          <div className="flex gap-2 pt-4">
             <Button
               onClick={handleSave}
               disabled={loading || uploading}
@@ -265,18 +305,19 @@ const DeveloperProfileModal = ({ open, onClose }: DeveloperProfileModalProps) =>
                 </>
               )}
             </Button>
+            {/* Password change removed for security */}
             <Button
               onClick={onClose}
               variant="outline"
               disabled={loading || uploading}
-              className="flex-1"
             >
-              <X className="h-4 w-4 mr-2" />
-              Cancel
+              <X className="h-4 w-4" />
             </Button>
           </div>
         </div>
       </DialogContent>
+      
+      {/* Password change modal removed for security */}
     </Dialog>
   );
 };

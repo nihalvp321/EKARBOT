@@ -50,13 +50,37 @@ const SalesAgentsList = ({ onNavigateToAdd }: SalesAgentsListProps) => {
 
   const toggleAgentStatus = async (id: string, currentStatus: boolean) => {
     try {
-      const { error } = await supabase
+      // First get the sales agent to find the linked user_id
+      const { data: agentData, error: fetchError } = await supabase
+        .from('sales_agents')
+        .select('user_id')
+        .eq('id', id)
+        .single();
+
+      if (fetchError || !agentData?.user_id) {
+        toast.error('Failed to find linked user account');
+        return;
+      }
+
+      // Update both sales_agents and app_users tables
+      const { error: agentError } = await supabase
         .from('sales_agents')
         .update({ is_active: !currentStatus })
         .eq('id', id);
 
-      if (error) {
+      if (agentError) {
         toast.error('Failed to update sales agent status');
+        return;
+      }
+
+      // Update the app_users table as well
+      const { error: userError } = await supabase
+        .from('app_users')
+        .update({ is_active: !currentStatus })
+        .eq('id', agentData.user_id);
+
+      if (userError) {
+        toast.error('Failed to update user account status');
         return;
       }
 

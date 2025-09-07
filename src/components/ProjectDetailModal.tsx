@@ -262,7 +262,7 @@ useEffect(() => {
 </Card>
 
             {/* Contact Information */}
-            {(project.sales_contact_name || project.sales_phone || project.sales_email) && (
+            {(project.contacts || project.sales_contact_name || project.sales_phone || project.sales_email) && (
               <Card>
                 <CardHeader>
                   <CardTitle className="text-lg flex items-center">
@@ -271,35 +271,88 @@ useEffect(() => {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="grid grid-cols-1 gap-4">
-                    {project.sales_contact_name && (
-                      <div className="flex items-center">
-                        <Users className="h-4 w-4 mr-2 text-gray-500" />
-                        <div>
-                          <label className="text-sm font-medium text-gray-600">Contact Name</label>
-                          <p className="text-sm">{project.sales_contact_name}</p>
+                   {(() => {
+                     let contacts = project.contacts;
+                     if (typeof contacts === 'string') {
+                       try {
+                         contacts = JSON.parse(contacts);
+                       } catch (e) {
+                         contacts = null;
+                       }
+                     }
+                     return contacts && Array.isArray(contacts) && contacts.length > 0;
+                   })() ? (
+                     <div className="space-y-4">
+                       {(() => {
+                         let contacts = project.contacts;
+                         if (typeof contacts === 'string') {
+                           try {
+                             contacts = JSON.parse(contacts);
+                           } catch (e) {
+                             contacts = [];
+                           }
+                         }
+                         return contacts || [];
+                       })().map((contact: any, index: number) => (
+                        <div key={index} className="p-4 border rounded-lg">
+                          <h4 className="font-medium text-gray-700 mb-3">Contact {index + 1}</h4>
+                          <div className="grid grid-cols-1 gap-3">
+                            <div className="flex items-center">
+                              <Users className="h-4 w-4 mr-2 text-gray-500" />
+                              <div>
+                                <label className="text-sm font-medium text-gray-600">Name</label>
+                                <p className="text-sm">{contact.name || 'Not specified'}</p>
+                              </div>
+                            </div>
+                            <div className="flex items-center">
+                              <Phone className="h-4 w-4 mr-2 text-gray-500" />
+                              <div>
+                                <label className="text-sm font-medium text-gray-600">Phone</label>
+                                <p className="text-sm">{contact.phone || 'Not specified'}</p>
+                              </div>
+                            </div>
+                            <div className="flex items-center">
+                              <Mail className="h-4 w-4 mr-2 text-gray-500" />
+                              <div>
+                                <label className="text-sm font-medium text-gray-600">Email</label>
+                                <p className="text-sm">{contact.email || 'Not specified'}</p>
+                              </div>
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    )}
-                    {project.sales_phone && (
-                      <div className="flex items-center">
-                        <Phone className="h-4 w-4 mr-2 text-gray-500" />
-                        <div>
-                          <label className="text-sm font-medium text-gray-600">Phone</label>
-                          <p className="text-sm">{project.sales_phone}</p>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 gap-4">
+                      {project.sales_contact_name && (
+                        <div className="flex items-center">
+                          <Users className="h-4 w-4 mr-2 text-gray-500" />
+                          <div>
+                            <label className="text-sm font-medium text-gray-600">Contact Name</label>
+                            <p className="text-sm">{project.sales_contact_name}</p>
+                          </div>
                         </div>
-                      </div>
-                    )}
-                    {project.sales_email && (
-                      <div className="flex items-center">
-                        <Mail className="h-4 w-4 mr-2 text-gray-500" />
-                        <div>
-                          <label className="text-sm font-medium text-gray-600">Email</label>
-                          <p className="text-sm">{project.sales_email}</p>
+                      )}
+                      {project.sales_phone && (
+                        <div className="flex items-center">
+                          <Phone className="h-4 w-4 mr-2 text-gray-500" />
+                          <div>
+                            <label className="text-sm font-medium text-gray-600">Phone</label>
+                            <p className="text-sm">{project.sales_phone}</p>
+                          </div>
                         </div>
-                      </div>
-                    )}
-                  </div>
+                      )}
+                      {project.sales_email && (
+                        <div className="flex items-center">
+                          <Mail className="h-4 w-4 mr-2 text-gray-500" />
+                          <div>
+                            <label className="text-sm font-medium text-gray-600">Email</label>
+                            <p className="text-sm">{project.sales_email}</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             )}
@@ -404,7 +457,7 @@ useEffect(() => {
                       </a>
                     </div>
                   )}
-                  {project.video_tour_url && (
+                   {project.video_tour_url && (
                     <div>
                       <label className="text-sm font-medium text-gray-600">Video Tour</label>
                       <a 
@@ -417,27 +470,24 @@ useEffect(() => {
                       </a>
                     </div>
                   )}
-
-                 {project.other_documents && project.other_documents.length > 0 && (
-  <div>
-    <label className="text-sm font-medium text-gray-600">Other Documents</label>
-    <ul className="mt-1 space-y-1">
-      {project.other_documents.map((docUrl: string, index: number) => (
-        <li key={index}>
-          <a 
-            href={docUrl} 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="text-blue-600 hover:text-blue-800 text-sm"
-          >
-            Document {index + 1}
-          </a>
-        </li>
-      ))}
-    </ul>
-  </div>
-)}
-
+                   {project.other_documents && Array.isArray(project.other_documents) && project.other_documents.length > 0 && (
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">Other Documents</label>
+                      <div className="space-y-2 mt-1">
+                        {project.other_documents.map((doc: any, index: number) => (
+                          <a 
+                            key={index}
+                            href={doc.url || doc} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="text-blue-600 hover:text-blue-800 text-sm block"
+                          >
+                            {doc.name || `Document ${index + 1}`}
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             )}

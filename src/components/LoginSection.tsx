@@ -1,9 +1,10 @@
-import * as React from 'react';
+
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Eye, EyeOff, LogIn, User } from 'lucide-react';
+// Removed password reset functionality for security
 
 interface LoginSectionProps {
   onLogin?: (email: string, password: string) => Promise<void>;
@@ -18,6 +19,7 @@ const LoginSection = ({ onLogin, loading = false, error, compact = false }: Logi
     password: ''
   });
   const [showPassword, setShowPassword] = useState(false);
+  // Removed password reset state for security
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -136,8 +138,12 @@ const LoginSection = ({ onLogin, loading = false, error, compact = false }: Logi
           >
             {loading ? 'Signing In...' : 'Sign In'}
           </Button>
+
+          {/* Password reset removed for security */}
         </form>
       </CardContent>
+      
+      {/* Password reset modal removed for security */}
     </Card>
   );
 };

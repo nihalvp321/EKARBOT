@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Search, Users, ArrowLeft } from 'lucide-react';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 interface Contact {
   id: string;
@@ -12,6 +13,7 @@ interface Contact {
   user_type: string;
   email: string;
   unreadCount?: number;
+  profile_image_url?: string;
 }
 
 interface ContactsListProps {
@@ -19,16 +21,18 @@ interface ContactsListProps {
   selectedContact: Contact | null;
   onSelectContact: (contact: Contact) => void;
   loading: boolean;
+  filterOptions?: string[];
 }
 
-const ContactsList = ({ contacts, selectedContact, onSelectContact, loading }: ContactsListProps) => {
+const ContactsList = ({ contacts, selectedContact, onSelectContact, loading, filterOptions = ['All', 'Developers', 'User Manager'] }: ContactsListProps) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterType, setFilterType] = useState<'All' | 'Developers' | 'Sales Agent'>('All');
+  const [filterType, setFilterType] = useState<string>('All');
 
   const filteredContacts = contacts.filter((contact) => {
     const matchesSearch = contact.username.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesFilter = filterType === 'All' || 
       (filterType === 'Developers' && contact.user_type === 'developer') ||
+      (filterType === 'User Manager' && contact.user_type === 'user_manager') ||
       (filterType === 'Sales Agent' && contact.user_type === 'sales_agent');
     
     return matchesSearch && matchesFilter;
@@ -73,12 +77,12 @@ const ContactsList = ({ contacts, selectedContact, onSelectContact, loading }: C
         </div>
         
         <div className="flex gap-1">
-          {['All', 'Developers', 'Sales Agent'].map((filter) => (
+          {filterOptions.map((filter) => (
             <Button
               key={filter}
               variant={filterType === filter ? "default" : "outline"}
               size="sm"
-              onClick={() => setFilterType(filter as any)}
+              onClick={() => setFilterType(filter)}
               className={`text-xs ${filterType === filter ? "bg-slate-600 hover:bg-slate-700" : ""}`}
             >
               {filter}
@@ -99,11 +103,14 @@ const ContactsList = ({ contacts, selectedContact, onSelectContact, loading }: C
               }`}
             >
               <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-gray-300 rounded-full flex items-center justify-center flex-shrink-0">
-                  <Users className="h-5 w-5 text-gray-600" />
-                </div>
+                <Avatar className="w-10 h-10 flex-shrink-0">
+                  <AvatarImage src={contact.profile_image_url} />
+                  <AvatarFallback className="bg-gray-300">
+                    <Users className="h-5 w-5 text-gray-600" />
+                  </AvatarFallback>
+                </Avatar>
                 <div className="flex-1 min-w-0">
-                  <p className="font-medium text-gray-800 truncate">{contact.username}</p>
+                  <p className="font-semibold text-gray-900 truncate">{contact.username}</p>
                   <p className="text-sm text-gray-500 capitalize truncate">
                     {contact.user_type.replace('_', ' ')}
                   </p>

@@ -24,7 +24,7 @@ const SalesAgentInbox = () => {
     handleSendMessage,
     handleSendFiles,
     handleSendVoice
-  } = useSalesAgentMessageHandlers(selectedContact);
+  } = useSalesAgentMessageHandlers(selectedContact, setMessages);
 
   useSalesAgentRealtimeMessages(selectedContact, setMessages);
 
@@ -40,36 +40,32 @@ const SalesAgentInbox = () => {
   const currentUserId = user?.user_id;
 
   return (
-    <div className="h-screen w-full flex flex-col bg-gray-50">
-      {/* Header */}
-      <div className="px-4 py-3 bg-white border-b shadow-sm">
-        <h1 className="text-xl md:text-2xl font-bold text-gray-800 mb-1">
-          Inbox - Connect with Developers & User Managers
-        </h1>
-        <p className="text-gray-600 text-sm">
-          Communicate directly with project developers and user managers
-        </p>
-      </div>
-
-      {/* Main Content */}
-      <div className="flex flex-1 overflow-hidden flex-col md:flex-row">
-        {/* Contacts Panel */}
-        <div className="w-full md:w-1/3 lg:w-1/4 border-r bg-white overflow-y-auto max-h-[50vh] md:max-h-full">
-          <div className="p-4 border-b bg-gray-50">
-            <h2 className="font-semibold text-lg text-gray-800 mb-2">
-              Contacts ({contacts.length})
+    <div className="h-[calc(100vh-140px)] bg-gray-50">
+      <div className="h-full flex">
+        {/* Contacts Sidebar */}
+        <div className="w-80 bg-white border-r border-gray-200 flex flex-col">
+          <div className="border-b p-4">
+            <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+              <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+              </svg>
+              Messages
             </h2>
           </div>
-          <ContactsList
-            contacts={contacts}
-            selectedContact={selectedContact}
-            onSelectContact={setSelectedContact}
-            loading={loading}
-          />
+          
+          <div className="flex-1 overflow-y-auto">
+            <ContactsList
+              contacts={contacts}
+              selectedContact={selectedContact}
+              onSelectContact={setSelectedContact}
+              loading={loading}
+              filterOptions={['All', 'Developers', 'User Manager']}
+            />
+          </div>
         </div>
 
         {/* Chat Area */}
-        <div className="flex-1 min-w-0 flex flex-col bg-white h-[50vh] md:h-full">
+        <div className="flex-1 flex flex-col">
           {selectedContact ? (
             <ChatArea
               selectedContact={selectedContact}
@@ -83,15 +79,13 @@ const SalesAgentInbox = () => {
               uploading={uploading}
             />
           ) : (
-            <div className="flex-1 flex items-center justify-center text-center text-gray-600 px-4">
-              <div>
-                <div className="w-16 h-16 rounded-full bg-gray-200 flex items-center justify-center mx-auto mb-4">
-                  <svg className="w-8 h-8 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                  </svg>
-                </div>
-                <h3 className="text-lg font-semibold text-gray-700">Select a Contact</h3>
-                <p className="text-sm mt-1">Choose someone to start messaging</p>
+            <div className="flex-1 flex items-center justify-center bg-gray-50">
+              <div className="text-center">
+                <svg className="h-12 w-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                </svg>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">No conversation selected</h3>
+                <p className="text-gray-500">Choose someone from your contacts to start messaging</p>
               </div>
             </div>
           )}

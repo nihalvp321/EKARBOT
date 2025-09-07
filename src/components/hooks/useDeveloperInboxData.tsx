@@ -27,6 +27,7 @@ interface Contact {
   user_type: string;
   email: string;
   unreadCount?: number;
+  profile_image_url?: string;
 }
 
 export const useDeveloperInboxData = () => {
@@ -55,7 +56,7 @@ export const useDeveloperInboxData = () => {
         return;
       }
 
-      // Fetch unread counts for each contact
+      // Fetch unread counts and profile images for each contact
       const contactsWithUnread = await Promise.all(
         (data || []).map(async (contact) => {
           const { data: unreadData } = await supabase
@@ -65,9 +66,21 @@ export const useDeveloperInboxData = () => {
             .eq('receiver_id', user.id)
             .eq('is_read', false);
 
+          // Get profile image URL based on user type
+          let profile_image_url = null;
+          if (contact.user_type === 'sales_agent') {
+            const { data: agentData } = await supabase
+              .from('sales_agents')
+              .select('profile_image_url')
+              .eq('user_id', contact.id)
+              .single();
+            profile_image_url = agentData?.profile_image_url;
+          }
+
           return {
             ...contact,
-            unreadCount: unreadData?.length || 0
+            unreadCount: unreadData?.length || 0,
+            profile_image_url
           };
         })
       );

@@ -12,7 +12,7 @@ interface Contact {
   unreadCount?: number;
 }
 
-export const useMessageHandlers = (selectedContact: Contact | null) => {
+export const useMessageHandlers = (selectedContact: Contact | null, setMessages?: React.Dispatch<React.SetStateAction<any[]>>) => {
   const [uploading, setUploading] = useState(false);
   const { user } = useAuth();
 
@@ -63,17 +63,24 @@ export const useMessageHandlers = (selectedContact: Contact | null) => {
     try {
       console.log('Sending message:', { sender: user.id, receiver: selectedContact.id, text: messageText });
       
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('messages')
         .insert({
           sender_id: user.id,
           receiver_id: selectedContact.id,
           message_text: messageText.trim()
-        });
+        })
+        .select('*, sender:app_users!messages_sender_id_fkey(username, user_type)')
+        .single();
 
       if (error) {
         console.error('Send message error:', error);
         throw error;
+      }
+      
+      // Immediately add to local messages for instant feedback
+      if (setMessages && data) {
+        setMessages(prev => [...prev, data]);
       }
       
       console.log('Message sent successfully');
@@ -101,7 +108,7 @@ export const useMessageHandlers = (selectedContact: Contact | null) => {
         try {
           const fileUrl = await uploadFile(file);
           
-          const { error } = await supabase
+          const { data, error } = await supabase
             .from('messages')
             .insert({
               sender_id: user.id,
@@ -111,11 +118,18 @@ export const useMessageHandlers = (selectedContact: Contact | null) => {
               attachment_type: file.type,
               attachment_name: file.name,
               attachment_size: file.size
-            });
+            })
+            .select('*, sender:app_users!messages_sender_id_fkey(username, user_type)')
+            .single();
 
           if (error) {
             console.error('Insert message error:', error);
             throw error;
+          }
+          
+          // Immediately add to local messages for instant feedback
+          if (setMessages && data) {
+            setMessages(prev => [...prev, data]);
           }
           
           console.log('File message inserted successfully');
@@ -163,7 +177,7 @@ export const useMessageHandlers = (selectedContact: Contact | null) => {
       
       const fileUrl = await uploadFile(file);
       
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('messages')
         .insert({
           sender_id: user.id,
@@ -173,11 +187,18 @@ export const useMessageHandlers = (selectedContact: Contact | null) => {
           attachment_type: file.type,
           attachment_name: file.name,
           attachment_size: file.size
-        });
+        })
+        .select('*, sender:app_users!messages_sender_id_fkey(username, user_type)')
+        .single();
 
       if (error) {
         console.error('Insert voice message error:', error);
         throw error;
+      }
+      
+      // Immediately add to local messages for instant feedback
+      if (setMessages && data) {
+        setMessages(prev => [...prev, data]);
       }
       
       console.log('Voice message sent successfully');

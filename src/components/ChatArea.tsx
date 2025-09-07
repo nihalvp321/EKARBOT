@@ -30,6 +30,7 @@ interface Contact {
   user_type: string;
   email: string;
   unreadCount?: number;
+  profile_image_url?: string;
 }
 
 interface ChatAreaProps {
@@ -76,8 +77,16 @@ const ChatArea = ({
               >
                 <ArrowLeft className="h-4 w-4" />
               </Button>
-              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center shadow-lg">
-                <Users className="h-6 w-6 text-white" />
+              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center shadow-lg overflow-hidden">
+                {selectedContact.profile_image_url ? (
+                  <img 
+                    src={selectedContact.profile_image_url} 
+                    alt={selectedContact.username}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <Users className="h-6 w-6 text-white" />
+                )}
               </div>
               <div>
                 <h3 className="font-semibold text-gray-800 text-lg">{selectedContact.username}</h3>

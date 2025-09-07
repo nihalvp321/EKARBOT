@@ -4,6 +4,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useDropdownOptions } from '@/components/hooks/useDropdownOptions';
 
 interface ProjectAmenitiesProps {
   formData: any;
@@ -12,14 +13,7 @@ interface ProjectAmenitiesProps {
 }
 
 const ProjectAmenities = ({ formData, handleInputChange, handleArrayChange }: ProjectAmenitiesProps) => {
-  const amenityOptions = [
-    'Swimming Pool', 'Gym/Fitness Center', 'Children\'s Play Area', 'BBQ Area',
-    'Landscaped Gardens', 'Jogging Track', 'Tennis Court', 'Basketball Court',
-    'Sauna', 'Steam Room', 'Spa', 'Business Center', 'Conference Room',
-    'Retail Outlets', 'Restaurants', 'Covered Parking', 'Valet Parking',
-    'Concierge Service', 'Housekeeping', 'Maintenance Service'
-  ];
-
+  const { options: amenityOptions, loading } = useDropdownOptions('amenities');
   const selectedAmenities = formData.amenities || [];
 
   const handleAmenityChange = (amenity: string, checked: boolean) => {
@@ -37,20 +31,24 @@ const ProjectAmenities = ({ formData, handleInputChange, handleArrayChange }: Pr
       <CardContent className="space-y-4">
         <div>
           <Label className="text-base font-medium mb-3 block">Select Amenities</Label>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            {amenityOptions.map((amenity) => (
-              <div key={amenity} className="flex items-center space-x-2">
-                <Checkbox
-                  id={`amenity-${amenity}`}
-                  checked={selectedAmenities.includes(amenity)}
-                  onCheckedChange={(checked) => handleAmenityChange(amenity, checked as boolean)}
-                />
-                <Label htmlFor={`amenity-${amenity}`} className="text-sm">
-                  {amenity}
-                </Label>
-              </div>
-            ))}
-          </div>
+          {loading ? (
+            <div className="text-sm text-gray-500">Loading amenities...</div>
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              {amenityOptions.map((amenity) => (
+                <div key={amenity.id} className="flex items-center space-x-2">
+                  <Checkbox
+                    id={`amenity-${amenity.id}`}
+                    checked={selectedAmenities.includes(amenity.value)}
+                    onCheckedChange={(checked) => handleAmenityChange(amenity.value, checked as boolean)}
+                  />
+                  <Label htmlFor={`amenity-${amenity.id}`} className="text-sm">
+                    {amenity.value}
+                  </Label>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

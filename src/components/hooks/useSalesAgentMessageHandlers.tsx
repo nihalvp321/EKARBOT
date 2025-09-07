@@ -11,7 +11,7 @@ interface Contact {
   email: string;
 }
 
-export const useSalesAgentMessageHandlers = (selectedContact: Contact | null) => {
+export const useSalesAgentMessageHandlers = (selectedContact: Contact | null, setMessages?: React.Dispatch<React.SetStateAction<any[]>>) => {
   const [uploading, setUploading] = useState(false);
   const { user } = useSalesAgentAuth();
 
@@ -21,19 +21,26 @@ export const useSalesAgentMessageHandlers = (selectedContact: Contact | null) =>
     const currentUserId = user.user_id;
 
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('messages')
         .insert({
           sender_id: currentUserId,
           receiver_id: selectedContact.id,
           message_text: messageText.trim(),
           is_read: false
-        });
+        })
+        .select('*, sender:app_users!messages_sender_id_fkey(username, user_type)')
+        .single();
 
       if (error) {
         console.error('Error sending message:', error);
         toast.error('Failed to send message');
         return;
+      }
+
+      // Immediately add to local messages for instant feedback
+      if (setMessages && data) {
+        setMessages(prev => [...prev, data]);
       }
 
       toast.success('Message sent successfully');
@@ -71,7 +78,7 @@ export const useSalesAgentMessageHandlers = (selectedContact: Contact | null) =>
 
         const messageText = caption || `Sent an attachment: ${file.name}`;
 
-        const { error: messageError } = await supabase
+        const { data: messageData, error: messageError } = await supabase
           .from('messages')
           .insert({
             sender_id: currentUserId,
@@ -82,12 +89,18 @@ export const useSalesAgentMessageHandlers = (selectedContact: Contact | null) =>
             attachment_name: file.name,
             attachment_size: file.size,
             is_read: false
-          });
+          })
+          .select('*, sender:app_users!messages_sender_id_fkey(username, user_type)')
+          .single();
 
         if (messageError) {
           console.error('Error sending message with attachment:', messageError);
           toast.error(`Failed to send message with ${file.name}`);
         } else {
+          // Immediately add to local messages for instant feedback
+          if (setMessages && messageData) {
+            setMessages(prev => [...prev, messageData]);
+          }
           toast.success(`File ${file.name} sent successfully`);
         }
       }
@@ -123,7 +136,7 @@ export const useSalesAgentMessageHandlers = (selectedContact: Contact | null) =>
         .from('message-attachments')
         .getPublicUrl(filePath);
 
-      const { error: messageError } = await supabase
+      const { data: messageData, error: messageError } = await supabase
         .from('messages')
         .insert({
           sender_id: currentUserId,
@@ -134,12 +147,18 @@ export const useSalesAgentMessageHandlers = (selectedContact: Contact | null) =>
           attachment_name: 'Voice Message',
           attachment_size: audioBlob.size,
           is_read: false
-        });
+        })
+        .select('*, sender:app_users!messages_sender_id_fkey(username, user_type)')
+        .single();
 
       if (messageError) {
         console.error('Error sending voice message:', messageError);
         toast.error('Failed to send voice message');
       } else {
+        // Immediately add to local messages for instant feedback
+        if (setMessages && messageData) {
+          setMessages(prev => [...prev, messageData]);
+        }
         toast.success('Voice message sent successfully');
       }
     } catch (error) {

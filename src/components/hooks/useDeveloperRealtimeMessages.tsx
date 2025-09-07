@@ -1,4 +1,4 @@
-import * as React from 'react';
+
 import { useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useDeveloperAuth } from '@/hooks/useDeveloperAuth';
@@ -49,14 +49,22 @@ export const useDeveloperRealtimeMessages = (
         },
         (payload) => {
           const newMessage = payload.new as Message;
-          setMessages(prev => [...prev, newMessage]);
+          
+          // Only add if not already in messages (prevent duplicates)
+          setMessages(prev => {
+            const messageExists = prev.some(msg => msg.id === newMessage.id);
+            if (messageExists) return prev;
+            return [...prev, newMessage];
+          });
           
           // Mark as read if we're the receiver
           if (newMessage.receiver_id === user.id) {
-            supabase
-              .from('messages')
-              .update({ is_read: true })
-              .eq('id', newMessage.id);
+            setTimeout(() => {
+              supabase
+                .from('messages')
+                .update({ is_read: true })
+                .eq('id', newMessage.id);
+            }, 0);
           }
         }
       )

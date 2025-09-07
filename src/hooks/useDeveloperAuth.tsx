@@ -85,6 +85,7 @@ export const DeveloperAuthProvider = ({ children }: { children: ReactNode }) => 
       }
 
       if (data) {
+        console.log('Developer profile found:', data);
         // Map developers table data to DeveloperProfile interface
         const profileData: DeveloperProfile = {
           id: data.id,
@@ -111,6 +112,10 @@ export const DeveloperAuthProvider = ({ children }: { children: ReactNode }) => 
           github_url: undefined,
         };
         setProfile(profileData);
+      } else {
+        console.log('No developer profile found in developers table for user:', userId);
+        // Don't set a fallback profile - this will prevent project submission without proper developer record
+        setProfile(null);
       }
     } catch (error) {
       console.error('Error in fetchDeveloperProfile:', error);
@@ -134,20 +139,25 @@ export const DeveloperAuthProvider = ({ children }: { children: ReactNode }) => 
       // Query the app_users table for developer type users
       const { data: userData, error } = await supabase
         .from('app_users')
-        .select('id, username, email, user_type, password_hash')
+        .select('id, username, email, user_type, password_hash, is_active')
         .eq('username', developerId.trim())
         .eq('user_type', 'developer')
-        .eq('is_active', true)
-        .single();
+        .maybeSingle();
 
       if (error || !userData) {
         console.error('Developer lookup error:', error);
         return { success: false, error: 'Invalid developer ID or password' };
       }
 
+      // Check if account is active
+      if (!userData.is_active) {
+        console.error('Developer account is deactivated');
+        return { success: false, error: 'Your account has been deactivated by the administrator. Please contact support.' };
+      }
+
       // For demo purposes, compare plain text password
-      if (userData.password_hash !== password) {
-        console.error('Password mismatch');
+      if (userData.password_hash !== password.trim()) {
+        console.error('Password mismatch for user:', developerId, 'Expected:', userData.password_hash, 'Got:', password);
         return { success: false, error: 'Invalid developer ID or password' };
       }
 

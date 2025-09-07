@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useSalesAgentAuth } from '@/hooks/useSalesAgentAuth';
@@ -26,6 +27,7 @@ interface Contact {
   user_type: string;
   email: string;
   unreadCount?: number;
+  profile_image_url?: string;
 }
 
 export const useSalesAgentInboxData = () => {
@@ -33,10 +35,11 @@ export const useSalesAgentInboxData = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
   const [loading, setLoading] = useState(true);
+  const [filterType, setFilterType] = useState<'all' | 'developer' | 'user_manager'>('all');
   const { user } = useSalesAgentAuth();
 
   const fetchContacts = async () => {
-    if (!user?.user_id) {
+    if (!user || !user.user_id) {
       setLoading(false);
       return;
     }
@@ -44,9 +47,15 @@ export const useSalesAgentInboxData = () => {
     const currentUserId = user.user_id;
 
     try {
+      // Only fetch developers and user managers, exclude sales agents
       const { data, error } = await supabase
         .from('app_users')
-        .select('id, username, user_type, email')
+        .select(`
+          id, 
+          username, 
+          user_type, 
+          email
+        `)
         .in('user_type', ['developer', 'user_manager'])
         .eq('is_active', true);
 
@@ -56,8 +65,9 @@ export const useSalesAgentInboxData = () => {
         return;
       }
 
+      // Fetch unread counts and profile images for each contact
       const contactsWithUnread = await Promise.all(
-        (data || []).map(async (contact) => {
+        (data || []).map(async (contact: any) => {
           const { data: unreadData } = await supabase
             .from('messages')
             .select('id')
@@ -65,9 +75,24 @@ export const useSalesAgentInboxData = () => {
             .eq('receiver_id', currentUserId)
             .eq('is_read', false);
 
+          // Get profile image URL based on user type
+          let profile_image_url = null;
+          if (contact.user_type === 'developer') {
+            const { data: devData } = await supabase
+              .from('developers')
+              .select('profile_image_url')
+              .eq('user_id', contact.id)
+              .single();
+            profile_image_url = devData?.profile_image_url;
+          }
+
           return {
-            ...contact,
-            unreadCount: unreadData?.length || 0
+            id: contact.id,
+            username: contact.username,
+            user_type: contact.user_type,
+            email: contact.email,
+            unreadCount: unreadData?.length || 0,
+            profile_image_url
           };
         })
       );
@@ -82,7 +107,7 @@ export const useSalesAgentInboxData = () => {
   };
 
   const fetchMessages = async (contactId: string) => {
-    if (!user?.user_id) return;
+    if (!user || !user.user_id) return;
 
     const currentUserId = user.user_id;
 
@@ -103,16 +128,20 @@ export const useSalesAgentInboxData = () => {
       }
 
       setMessages(data || []);
-
+      
+      // Mark messages as read
       await supabase
         .from('messages')
         .update({ is_read: true })
         .eq('sender_id', contactId)
         .eq('receiver_id', currentUserId);
 
-      setContacts(prev =>
-        prev.map(contact =>
-          contact.id === contactId ? { ...contact, unreadCount: 0 } : contact
+      // Update unread count for this contact
+      setContacts(prev => 
+        prev.map(contact => 
+          contact.id === contactId 
+            ? { ...contact, unreadCount: 0 }
+            : contact
         )
       );
     } catch (error) {
@@ -121,22 +150,35 @@ export const useSalesAgentInboxData = () => {
     }
   };
 
+  const getFilteredContacts = () => {
+    if (filterType === 'all') {
+      return contacts;
+    }
+    return contacts.filter(contact => contact.user_type === filterType);
+  };
+
   useEffect(() => {
-    if (user) fetchContacts();
+    if (user) {
+      fetchContacts();
+    }
   }, [user]);
 
   useEffect(() => {
-    if (selectedContact && user) fetchMessages(selectedContact.id);
+    if (selectedContact && user) {
+      fetchMessages(selectedContact.id);
+    }
   }, [selectedContact, user]);
 
   return {
-    contacts,
+    contacts: getFilteredContacts(),
     setContacts,
     messages,
     setMessages,
     selectedContact,
     setSelectedContact,
     loading,
+    filterType,
+    setFilterType,
     fetchContacts,
     fetchMessages
   };

@@ -27,6 +27,7 @@ interface Contact {
   user_type: string;
   email: string;
   unreadCount?: number;
+  profile_image_url?: string;
 }
 
 export const useUserManagerInboxData = () => {
@@ -45,8 +46,13 @@ export const useUserManagerInboxData = () => {
     try {
       const { data, error } = await supabase
         .from('app_users')
-        .select('id, username, user_type, email')
-        .neq('user_type', 'user_manager')
+        .select(`
+          id, 
+          username, 
+          user_type, 
+          email
+        `)
+        .in('user_type', ['developer', 'sales_agent'])
         .eq('is_active', true);
 
       if (error) {
@@ -55,9 +61,8 @@ export const useUserManagerInboxData = () => {
         return;
       }
 
-      // Fetch unread counts for each contact
       const contactsWithUnread = await Promise.all(
-        (data || []).map(async (contact) => {
+        (data || []).map(async (contact: any) => {
           const { data: unreadData } = await supabase
             .from('messages')
             .select('id')
@@ -65,9 +70,31 @@ export const useUserManagerInboxData = () => {
             .eq('receiver_id', user.id)
             .eq('is_read', false);
 
+          // Get profile image URL based on user type
+          let profile_image_url = null;
+          if (contact.user_type === 'developer') {
+            const { data: devData } = await supabase
+              .from('developers')
+              .select('profile_image_url')
+              .eq('user_id', contact.id)
+              .single();
+            profile_image_url = devData?.profile_image_url;
+          } else if (contact.user_type === 'sales_agent') {
+            const { data: agentData } = await supabase
+              .from('sales_agents')
+              .select('profile_image_url')
+              .eq('user_id', contact.id)
+              .single();
+            profile_image_url = agentData?.profile_image_url;
+          }
+
           return {
-            ...contact,
-            unreadCount: unreadData?.length || 0
+            id: contact.id,
+            username: contact.username,
+            user_type: contact.user_type,
+            email: contact.email,
+            unreadCount: unreadData?.length || 0,
+            profile_image_url
           };
         })
       );

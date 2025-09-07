@@ -1,3 +1,4 @@
+
 import { useSalesAgentAuth } from '@/hooks/useSalesAgentAuth';
 import SalesAgentLoginPage from './SalesAgentLoginPage';
 import SalesAgentLayout from './SalesAgentLayout';
@@ -6,29 +7,13 @@ import SalesAgentInbox from './SalesAgentInbox';
 import SalesAgentScheduleVisit from './SalesAgentScheduleVisit';
 import SalesAgentSavedProjects from './SalesAgentSavedProjects';
 import SalesAgentVisitsList from './SalesAgentVisitsList';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 
 const SalesAgentApp = () => {
   const { user, loading } = useSalesAgentAuth();
-
-  // ✅ Use localStorage to store the last active page
   const [currentPage, setCurrentPage] = useState('ekarbot');
-
   const [projects, setProjects] = useState<any[]>([]);
   const [n8nResponse, setN8nResponse] = useState<any>(null);
-
-  // ✅ Load the saved page from localStorage when component mounts
-  useEffect(() => {
-    const savedPage = localStorage.getItem('salesAgentCurrentPage');
-    if (savedPage) {
-      setCurrentPage(savedPage);
-    }
-  }, []);
-
-  // ✅ Save current page to localStorage on every change
-  useEffect(() => {
-    localStorage.setItem('salesAgentCurrentPage', currentPage);
-  }, [currentPage]);
 
   if (loading) {
     return (
@@ -38,21 +23,16 @@ const SalesAgentApp = () => {
     );
   }
 
+  // Show login page if user is not authenticated
   if (!user) {
     return <SalesAgentLoginPage />;
   }
 
+  // Show main app if user is authenticated
   const renderPage = () => {
     switch (currentPage) {
       case 'ekarbot':
-        return (
-          <SalesAgentMainPage
-            projects={projects}
-            setProjects={setProjects}
-            n8nResponse={n8nResponse}
-            setN8nResponse={setN8nResponse}
-          />
-        );
+        return <SalesAgentMainPage projects={projects} setProjects={setProjects} n8nResponse={n8nResponse} setN8nResponse={setN8nResponse} />;
       case 'saved-projects':
         return <SalesAgentSavedProjects />;
       case 'inbox':
@@ -62,14 +42,7 @@ const SalesAgentApp = () => {
       case 'visits-list':
         return <SalesAgentVisitsList />;
       default:
-        return (
-          <SalesAgentMainPage
-            projects={projects}
-            setProjects={setProjects}
-            n8nResponse={n8nResponse}
-            setN8nResponse={setN8nResponse}
-          />
-        );
+        return <SalesAgentMainPage projects={projects} setProjects={setProjects} n8nResponse={n8nResponse} setN8nResponse={setN8nResponse} />;
     }
   };
 

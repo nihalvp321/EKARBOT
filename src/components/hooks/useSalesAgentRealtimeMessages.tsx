@@ -1,4 +1,4 @@
-import * as React from 'react';
+
 import { useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useSalesAgentAuth } from '@/hooks/useSalesAgentAuth';
@@ -45,29 +45,31 @@ export const useSalesAgentRealtimeMessages = (
           table: 'messages',
           filter: `or(and(sender_id.eq.${currentUserId},receiver_id.eq.${selectedContact.id}),and(sender_id.eq.${selectedContact.id},receiver_id.eq.${currentUserId}))`
         },
-        async (payload) => {
+        (payload) => {
           const newMessage = payload.new as Message;
           
-          // Fetch sender info
-          const { data: senderData } = await supabase
-            .from('app_users')
-            .select('username, user_type')
-            .eq('id', newMessage.sender_id)
-            .single();
-
-          const messageWithSender = {
-            ...newMessage,
-            sender: senderData || { username: 'Unknown', user_type: 'unknown' }
-          };
-
-          setMessages(prev => [...prev, messageWithSender]);
+          // Only add if not already in messages (prevent duplicates)
+          setMessages(prev => {
+            const messageExists = prev.some(msg => msg.id === newMessage.id);
+            if (messageExists) return prev;
+            
+            // Add sender info if not present
+            const messageWithSender = {
+              ...newMessage,
+              sender: newMessage.sender || { username: 'Unknown', user_type: 'unknown' }
+            };
+            
+            return [...prev, messageWithSender];
+          });
 
           // Mark as read if it's from the selected contact
           if (newMessage.sender_id === selectedContact.id) {
-            await supabase
-              .from('messages')
-              .update({ is_read: true })
-              .eq('id', newMessage.id);
+            setTimeout(() => {
+              supabase
+                .from('messages')
+                .update({ is_read: true })
+                .eq('id', newMessage.id);
+            }, 0);
           }
         }
       )

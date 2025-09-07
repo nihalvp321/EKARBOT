@@ -1,10 +1,11 @@
-import * as React from 'react';
+
 import { useState } from 'react';
 import { useDeveloperAuth } from '@/hooks/useDeveloperAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Lock, Eye, EyeOff } from 'lucide-react';
+// Removed password reset functionality for security
 
 const DeveloperLoginPage = () => {
   const [developerId, setDeveloperId] = useState('');
@@ -12,6 +13,7 @@ const DeveloperLoginPage = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  // Removed password reset state for security
   const { signIn } = useDeveloperAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -96,9 +98,13 @@ const DeveloperLoginPage = () => {
             >
               {loading ? 'Signing In...' : 'Sign In'}
             </Button>
+
+            {/* Password reset removed for security */}
           </form>
         </CardContent>
       </Card>
+      
+      {/* Password reset modal removed for security */}
     </div>
   );
 };

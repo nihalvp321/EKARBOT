@@ -25,7 +25,7 @@ const UserManagerInbox = () => {
     handleSendMessage,
     handleSendFiles,
     handleSendVoice
-  } = useSecureMessageHandlers(selectedContact);
+  } = useSecureMessageHandlers(selectedContact, setMessages);
 
   useUserManagerRealtimeMessages(selectedContact, setMessages);
 
@@ -35,21 +35,33 @@ const UserManagerInbox = () => {
   };
 
   return (
-    <div className="h-[calc(100vh-120px)] w-full bg-gray-50">
-      <div className="h-full max-w-full mx-auto">
-        <div className="flex h-full">
-          {/* Contacts List - Fixed width on desktop, full width on mobile */}
-          <div className="w-full lg:w-80 lg:flex-shrink-0 lg:border-r border-gray-200">
+    <div className="h-[calc(100vh-140px)] bg-gray-50">
+      <div className="h-full flex">
+        {/* Contacts Sidebar */}
+        <div className="w-80 bg-white border-r border-gray-200 flex flex-col">
+          <div className="border-b p-4">
+            <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+              <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+              </svg>
+              Messages
+            </h2>
+          </div>
+          
+          <div className="flex-1 overflow-y-auto">
             <ContactsList
               contacts={contacts}
               selectedContact={selectedContact}
               onSelectContact={setSelectedContact}
               loading={loading}
+              filterOptions={['All', 'Developers', 'Sales Agent']}
             />
           </div>
-          
-          {/* Chat Area - Takes remaining space */}
-          <div className="hidden lg:flex lg:flex-1 lg:min-w-0">
+        </div>
+
+        {/* Chat Area */}
+        <div className="flex-1 flex flex-col">
+          {selectedContact ? (
             <ChatArea
               selectedContact={selectedContact}
               messages={messages}
@@ -61,22 +73,15 @@ const UserManagerInbox = () => {
               onSendVoice={handleSendVoice}
               uploading={uploading}
             />
-          </div>
-          
-          {/* Mobile Chat Overlay */}
-          {selectedContact && (
-            <div className="fixed inset-0 z-50 bg-white lg:hidden">
-              <ChatArea
-                selectedContact={selectedContact}
-                messages={messages}
-                currentUserId={user?.id}
-                newMessage={newMessage}
-                setNewMessage={setNewMessage}
-                onSendMessage={onSendMessage}
-                onSendFiles={handleSendFiles}
-                onSendVoice={handleSendVoice}
-                uploading={uploading}
-              />
+          ) : (
+            <div className="flex-1 flex items-center justify-center bg-gray-50">
+              <div className="text-center">
+                <svg className="h-12 w-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                </svg>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">No conversation selected</h3>
+                <p className="text-gray-500">Choose someone from your contacts to start messaging</p>
+              </div>
             </div>
           )}
         </div>

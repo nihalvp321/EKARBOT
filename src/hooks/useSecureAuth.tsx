@@ -105,40 +105,39 @@ export const SecureAuthProvider = ({ children }: { children: ReactNode }) => {
 
       console.log('Attempting to sign in with:', { email });
 
-      // Query the app_users table directly
-      const { data: userData, error } = await supabase
-        .from('app_users')
-        .select('id, username, email, user_type, password_hash')
-        .eq('email', email.trim().toLowerCase())
-        .eq('is_active', true)
-        .single();
+      // Use the security definer function to authenticate
+      const { data: authResult, error } = await supabase
+        .rpc('authenticate_app_user', {
+          input_email: email.trim().toLowerCase(),
+          input_password: password
+        });
 
-      if (error || !userData) {
-        console.error('User lookup error:', error);
+      if (error || !authResult || authResult.length === 0) {
+        console.error('Authentication error:', error);
         return { success: false, error: 'Invalid email or password' };
       }
 
-      // For demo purposes, compare plain text password
-      // In production, this should use proper password hashing
-      if (userData.password_hash !== password) {
-        console.error('Password mismatch');
+      const userData = authResult[0];
+      
+      if (!userData.success) {
+        console.error('Authentication failed');
         return { success: false, error: 'Invalid email or password' };
       }
 
       // If this is a sales agent, ensure they're linked to auth users
       if (userData.user_type === 'sales_agent') {
-        await linkSalesAgentToAuthUser(userData.id, userData.email);
+        await linkSalesAgentToAuthUser(userData.user_id, userData.email);
       }
 
       // Create user session
       const appUser: AppUser = {
-        id: userData.id,
+        id: userData.user_id,
         username: userData.username,
         email: userData.email,
         user_type: userData.user_type
       };
 
-      const sessionToken = `token_${userData.id}_${Date.now()}`;
+      const sessionToken = `token_${userData.user_id}_${Date.now()}`;
       const userSession = { access_token: sessionToken, user: appUser };
 
       // Store in state and localStorage

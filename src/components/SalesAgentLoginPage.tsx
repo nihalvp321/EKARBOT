@@ -1,10 +1,11 @@
-import * as React from 'react';
+
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useSalesAgentAuth } from '@/hooks/useSalesAgentAuth';
 import { Eye, EyeOff, AlertCircle, Shield } from 'lucide-react';
+import { toast } from 'sonner';
 
 const SalesAgentLoginPage = () => {
   const [formData, setFormData] = useState({
@@ -131,7 +132,17 @@ const SalesAgentLoginPage = () => {
           </form>
 
           <div className="mt-6 text-center">
-            <p className="text-xs text-gray-500">
+            <button 
+              type="button" 
+              className="text-sm text-gray-600 hover:text-gray-800 underline"
+              onClick={() => {
+                // TODO: Add forgot password functionality for sales agents
+                toast.info('Forgot password feature coming soon. Please contact your administrator.');
+              }}
+            >
+              Forgot password?
+            </button>
+            <p className="text-xs text-gray-500 mt-2">
               Only authorized sales agents can access this system.<br />
               Contact your administrator if you need assistance.
             </p>

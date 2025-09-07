@@ -1,5 +1,4 @@
-import * as React from 'react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
@@ -24,6 +23,43 @@ const ManageDevelopers = ({ onNavigateToList }: ManageDevelopersProps) => {
   });
   const [loading, setLoading] = useState(false);
   const [showCredentials, setShowCredentials] = useState(false);
+
+  const generateDeveloperId = async () => {
+    try {
+      // Get the highest existing developer ID
+      const { data, error } = await supabase
+        .from('developers')
+        .select('developer_id')
+        .order('developer_id', { ascending: false })
+        .limit(1);
+
+      if (error) {
+        console.error('Error fetching developer IDs:', error);
+        return;
+      }
+
+      let nextId = 'Dev1001'; // Default starting ID
+      
+      if (data && data.length > 0) {
+        const lastId = data[0].developer_id;
+        // Extract number from ID like "Dev1001"
+        const match = lastId.match(/Dev(\d+)/);
+        if (match) {
+          const number = parseInt(match[1]) + 1;
+          nextId = `Dev${number}`;
+        }
+      }
+
+      setFormData(prev => ({ ...prev, developerId: nextId }));
+    } catch (error) {
+      console.error('Error generating developer ID:', error);
+    }
+  };
+
+  // Auto-generate developer ID when component mounts
+  useEffect(() => {
+    generateDeveloperId();
+  }, []);
 
   const generatePassword = () => {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
@@ -57,8 +93,12 @@ const ManageDevelopers = ({ onNavigateToList }: ManageDevelopersProps) => {
 
       if (userError) {
         console.error('User creation error:', userError);
-        if (userError.code === '23505') {
-          toast.error('Developer ID or email already exists');
+        if (userError.code === '23505' && userError.message.includes('email')) {
+          toast.error('Email address already exists. Please use a different email.');
+        } else if (userError.code === '23505' && userError.message.includes('username')) {
+          toast.error('Developer ID already exists. Please generate a new ID.');
+        } else if (userError.code === '42501') {
+          toast.error('Permission denied. Please ensure you are logged in as a user manager.');
         } else {
           toast.error('Failed to create user account: ' + userError.message);
         }
@@ -119,6 +159,8 @@ const ManageDevelopers = ({ onNavigateToList }: ManageDevelopersProps) => {
       password: ''
     });
     setShowCredentials(false);
+    // Auto-generate new ID when resetting
+    generateDeveloperId();
   };
 
   if (showCredentials) {
@@ -168,13 +210,23 @@ const ManageDevelopers = ({ onNavigateToList }: ManageDevelopersProps) => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <label className="text-sm font-medium text-gray-700">Developer ID</label>
-                <Input
-                  value={formData.developerId}
-                  onChange={(e) => setFormData(prev => ({ ...prev, developerId: e.target.value }))}
-                  placeholder="Dev1001"
-                  className="h-10"
-                  required
-                />
+                <div className="flex gap-2">
+                  <Input
+                    value={formData.developerId}
+                    placeholder="Dev1001"
+                    className="h-10 bg-gray-50"
+                    readOnly
+                    required
+                  />
+                  <Button
+                    type="button"
+                    onClick={generateDeveloperId}
+                    variant="outline"
+                    className="px-3"
+                  >
+                    Auto
+                  </Button>
+                </div>
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium text-gray-700">Developer Name</label>

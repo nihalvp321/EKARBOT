@@ -1,8 +1,13 @@
-import * as React from 'react';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useDeveloperAuth } from '@/hooks/useDeveloperAuth';
 import { toast } from 'sonner';
+
+interface ContactInfo {
+  name: string;
+  phone: string;
+  email: string;
+}
 
 interface FormData {
   project_title: string;
@@ -38,6 +43,7 @@ interface FormData {
   sales_contact_name: string;
   sales_phone: string;
   sales_email: string;
+  contacts: ContactInfo[];
 }
 
 const initialFormData: FormData = {
@@ -73,7 +79,8 @@ const initialFormData: FormData = {
   video_tour_url: '',
   sales_contact_name: '',
   sales_phone: '',
-  sales_email: ''
+  sales_email: '',
+  contacts: [{ name: '', phone: '', email: '' }]
 };
 
 export const useProjectForm = (editProject?: any, autoFillData?: any, onSave?: () => void) => {
@@ -132,7 +139,8 @@ export const useProjectForm = (editProject?: any, autoFillData?: any, onSave?: (
         video_tour_url: editProject.video_tour_url || '',
         sales_contact_name: editProject.sales_contact_name || '',
         sales_phone: editProject.sales_phone || '',
-        sales_email: editProject.sales_email || ''
+        sales_email: editProject.sales_email || '',
+        contacts: Array.isArray(editProject.contacts) ? editProject.contacts : [{ name: '', phone: '', email: '' }]
       });
     }
   }, [editProject]);
@@ -182,7 +190,7 @@ export const useProjectForm = (editProject?: any, autoFillData?: any, onSave?: (
         ...(generatedProjectId && { project_id: generatedProjectId }),
         project_title: formData.project_title,
         developer_name: formData.developer_name,
-        developer_id: profile.id,
+        developer_id: profile.developer_id || profile.id,
         user_id: user.id,
         description: formData.description,
         project_type: formData.project_type,
@@ -215,6 +223,7 @@ export const useProjectForm = (editProject?: any, autoFillData?: any, onSave?: (
         sales_contact_name: formData.sales_contact_name,
         sales_phone: formData.sales_phone,
         sales_email: formData.sales_email,
+        contacts: JSON.stringify(formData.contacts),
         source: 'app data'
       };
 

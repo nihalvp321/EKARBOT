@@ -60,19 +60,38 @@ const MyProjects = () => {
   const confirmDelete = async () => {
     if (!deletingProjectId) return;
 
+    console.log('Attempting to delete project with ID:', deletingProjectId);
+
     try {
-      const { error } = await supabase
+      // First, delete any saved projects that reference this project
+      const { error: savedProjectsError } = await supabase
+        .from('saved_projects')
+        .delete()
+        .eq('project_id', deletingProjectId);
+
+      if (savedProjectsError) {
+        console.error('Error deleting saved projects:', savedProjectsError);
+        toast.error(`Failed to delete related saved projects: ${savedProjectsError.message}`);
+        return;
+      }
+
+      // Then delete the main project
+      const { data, error } = await supabase
         .from('projects')
         .delete()
         .eq('project_id', deletingProjectId);
 
+      console.log('Delete result:', { data, error });
+
       if (error) {
-        toast.error('Failed to delete project');
+        console.error('Delete error details:', error);
+        toast.error(`Failed to delete project: ${error.message}`);
       } else {
         toast.success('Project deleted successfully');
         fetchProjects();
       }
     } catch (error) {
+      console.error('Delete catch error:', error);
       toast.error('Failed to delete project');
     } finally {
       setShowDeleteModal(false);
@@ -195,7 +214,11 @@ const MyProjects = () => {
   <CardContent className="p-4 space-y-3">
     <div className="flex items-center text-sm text-gray-600">
       <MapPin className="h-4 w-4 mr-2" />
-      <span>{project.city || 'Location not specified'}</span>
+      <span>
+        {[project.city, project.emirate, project.region_area]
+          .filter(Boolean)
+          .join(', ') || 'Location not specified'}
+      </span>
     </div>
 
     {project.starting_price_aed && (

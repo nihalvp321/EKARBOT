@@ -7,12 +7,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger
-} from '@/components/ui/dropdown-menu';
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuTrigger 
+} from "@/components/ui/dropdown-menu"
 import { MoreHorizontal, Plus, Edit, Trash2 } from 'lucide-react';
 
 interface DropdownSetting {
@@ -53,17 +53,21 @@ const ProjectDropdownSettings = () => {
         .order('category', { ascending: true })
         .order('display_order', { ascending: true });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching dropdown settings:', error);
+        toast.error('Failed to fetch dropdown settings');
+        return;
+      }
 
-      const settingsWithDefaults = (data || []).map(item => ({
+      // Ensure description field is present, defaulting to empty string if null
+      const settingsWithDescription = (data || []).map(item => ({
         ...item,
-        description: item.description || '',
-        is_active: item.is_active ?? true
+        description: item.description || ''
       }));
 
-      setSettings(settingsWithDefaults);
+      setSettings(settingsWithDescription);
     } catch (error) {
-      console.error('Error:', error);
+      console.error('Error fetching dropdown settings:', error);
       toast.error('Failed to fetch settings');
     } finally {
       setLoading(false);
@@ -78,52 +82,26 @@ const ProjectDropdownSettings = () => {
   const handleCancel = () => {
     setEditingItem(null);
     setFormData({});
+    setNewItemCategory('');
   };
 
-  const handleSoftDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this item?')) return;
+  const handleDelete = async (id: string) => {
     try {
       const { error } = await supabase
         .from('dropdown_settings')
-        .update({ is_active: false })
+        .delete()
         .eq('id', id);
 
-      if (error) throw error;
+      if (error) {
+        toast.error('Failed to delete item');
+        return;
+      }
 
-      toast.success('Item deleted');
-      await fetchSettings();
+      setSettings(prev => prev.filter(item => item.id !== id));
+      toast.success('Item deleted successfully');
     } catch (error) {
-      console.error('Delete error:', error);
-      toast.error('Failed to delete');
-    }
-  };
-
-  const handleAddNewItem = async (category: string) => {
-    if (!newItemCategory.trim()) {
-      toast.error('Enter value');
-      return;
-    }
-
-    const newItem = {
-      category,
-      code: '',
-      value: newItemCategory.trim(),
-      description: '',
-      display_order: 0,
-      is_active: true
-    };
-
-    try {
-      const { error } = await supabase.from('dropdown_settings').insert([newItem]);
-
-      if (error) throw error;
-
-      toast.success('Item added');
-      setNewItemCategory('');
-      await fetchSettings();
-    } catch (error) {
-      console.error(error);
-      toast.error('Failed to add item');
+      console.error('Error deleting item:', error);
+      toast.error('Failed to delete item');
     }
   };
 
@@ -134,31 +112,55 @@ const ProjectDropdownSettings = () => {
     }
 
     try {
-      const dataToSave = {
-        ...formData,
+      const projectData = {
+        category: formData.category,
         code: formData.code || '',
+        value: formData.value,
         description: formData.description || '',
-        display_order: formData.display_order || 0,
-        is_active: formData.is_active ?? true
+        is_active: formData.is_active ?? true,
+        display_order: formData.display_order || 0
       };
 
       if (editingItem) {
-        await supabase.from('dropdown_settings').update(dataToSave).eq('id', editingItem);
-        toast.success('Item updated');
+        const { error } = await supabase
+          .from('dropdown_settings')
+          .update(projectData)
+          .eq('id', editingItem);
+
+        if (error) {
+          toast.error('Failed to update item');
+          return;
+        }
+        toast.success('Item updated successfully');
+      } else {
+        const { error } = await supabase
+          .from('dropdown_settings')
+          .insert([projectData]);
+
+        if (error) {
+          toast.error('Failed to add item');
+          return;
+        }
+        toast.success('Item added successfully');
       }
 
       setEditingItem(null);
       setFormData({});
+      setNewItemCategory('');
       await fetchSettings();
     } catch (error) {
-      console.error(error);
-      toast.error('Save failed');
+      console.error('Error saving item:', error);
+      toast.error('Failed to save item');
     }
   };
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
-      <h1 className="text-3xl font-bold">Project Dropdown Settings</h1>
+      <div className="flex justify-between items-center">
+        <h1 className="text-3xl font-bold text-gray-900">
+          Project Dropdown Settings
+        </h1>
+      </div>
 
       {categories.map(category => (
         <Card key={category} className="shadow-sm">
@@ -166,15 +168,16 @@ const ProjectDropdownSettings = () => {
             <CardTitle>{category.replace(/_/g, ' ').toUpperCase()}</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
+            <div className="space-y-4">
               {settings
-                .filter(item => item.category === category && item.is_active)
+                .filter(item => item.category === category)
                 .map(item => (
-                  <div key={item.id} className="flex justify-between items-center py-1 border-b">
+                  <div key={item.id} className="flex items-center justify-between py-2 border-b border-gray-200">
                     <span>{item.value}</span>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" className="h-8 w-8 p-0">
+                          <span className="sr-only">Open menu</span>
                           <MoreHorizontal className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
@@ -182,23 +185,33 @@ const ProjectDropdownSettings = () => {
                         <DropdownMenuItem onClick={() => handleEdit(item)}>
                           <Edit className="mr-2 h-4 w-4" /> Edit
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleSoftDelete(item.id)} className="text-red-600">
+                        <DropdownMenuItem onClick={() => handleDelete(item.id)} className="text-red-600">
                           <Trash2 className="mr-2 h-4 w-4" /> Delete
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>
                 ))}
-              <div className="flex gap-2">
-                <Input
-                  placeholder="New item value"
-                  value={newItemCategory}
-                  onChange={(e) => setNewItemCategory(e.target.value)}
-                />
-                <Button onClick={() => handleAddNewItem(category)} disabled={!newItemCategory.trim()}>
-                  <Plus className="h-4 w-4 mr-1" /> Add
-                </Button>
-              </div>
+              
+              {editingItem === null && (
+                <div className="flex items-center justify-between">
+                  <Input
+                    type="text"
+                    placeholder="New item value"
+                    value={newItemCategory}
+                    onChange={(e) => setNewItemCategory(e.target.value)}
+                  />
+                  <Button 
+                    onClick={() => {
+                      setFormData({ category: category, value: newItemCategory });
+                      handleSave();
+                    }}
+                    disabled={!newItemCategory.trim()}
+                  >
+                    Add Item
+                  </Button>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -210,66 +223,72 @@ const ProjectDropdownSettings = () => {
             <CardTitle>Edit Item</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
+            <form className="space-y-4">
               <div>
-                <Label>Category</Label>
+                <Label htmlFor="category">Category</Label>
                 <Select
                   value={formData.category || ''}
-                  onValueChange={(val) => setFormData(prev => ({ ...prev, category: val }))}
+                  onValueChange={(value) => setFormData({ ...formData, category: value })}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select category" />
+                    <SelectValue placeholder="Select a category" />
                   </SelectTrigger>
                   <SelectContent>
                     {categories.map(cat => (
-                      <SelectItem key={cat} value={cat}>
-                        {cat}
-                      </SelectItem>
+                      <SelectItem key={cat} value={cat}>{cat}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
               <div>
-                <Label>Value</Label>
+                <Label htmlFor="value">Value</Label>
                 <Input
+                  type="text"
+                  id="value"
                   value={formData.value || ''}
-                  onChange={(e) => setFormData(prev => ({ ...prev, value: e.target.value }))}
+                  onChange={(e) => setFormData({ ...formData, value: e.target.value })}
                 />
               </div>
               <div>
-                <Label>Code</Label>
+                <Label htmlFor="code">Code</Label>
                 <Input
+                  type="text"
+                  id="code"
                   value={formData.code || ''}
-                  onChange={(e) => setFormData(prev => ({ ...prev, code: e.target.value }))}
+                  onChange={(e) => setFormData({ ...formData, code: e.target.value })}
                 />
               </div>
               <div>
-                <Label>Description</Label>
+                <Label htmlFor="description">Description</Label>
                 <Input
+                  type="text"
+                  id="description"
                   value={formData.description || ''}
-                  onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 />
               </div>
               <div>
-                <Label>Display Order</Label>
+                <Label htmlFor="display_order">Display Order</Label>
                 <Input
                   type="number"
+                  id="display_order"
                   value={formData.display_order || 0}
-                  onChange={(e) => setFormData(prev => ({ ...prev, display_order: parseInt(e.target.value) }))}
+                  onChange={(e) => setFormData({ ...formData, display_order: parseInt(e.target.value) })}
                 />
               </div>
-              <div className="flex items-center justify-between">
-                <Label>Active</Label>
+              <div>
+                <Label htmlFor="is_active">Is Active</Label>
                 <Switch
+                  id="is_active"
                   checked={formData.is_active ?? true}
-                  onCheckedChange={(checked) => setFormData(prev => ({ ...prev, is_active: checked }))}
+                  onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })}
                 />
               </div>
-              <div className="flex justify-end gap-2">
+              <div className="flex justify-end space-x-2">
                 <Button variant="ghost" onClick={handleCancel}>Cancel</Button>
                 <Button onClick={handleSave}>Save</Button>
               </div>
-            </div>
+            </form>
           </CardContent>
         </Card>
       )}

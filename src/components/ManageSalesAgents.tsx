@@ -1,5 +1,4 @@
-import * as React from 'react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
@@ -21,6 +20,43 @@ const ManageSalesAgents = ({ onNavigateToList }: ManageSalesAgentsProps) => {
   });
   const [loading, setLoading] = useState(false);
   const [showCredentials, setShowCredentials] = useState(false);
+
+  const generateSalesAgentId = async () => {
+    try {
+      // Get the highest existing sales agent ID
+      const { data, error } = await supabase
+        .from('sales_agents')
+        .select('sales_agent_id')
+        .order('sales_agent_id', { ascending: false })
+        .limit(1);
+
+      if (error) {
+        console.error('Error fetching sales agent IDs:', error);
+        return;
+      }
+
+      let nextId = 'S101'; // Default starting ID
+      
+      if (data && data.length > 0) {
+        const lastId = data[0].sales_agent_id;
+        // Extract number from ID like "S101"
+        const match = lastId.match(/S(\d+)/);
+        if (match) {
+          const number = parseInt(match[1]) + 1;
+          nextId = `S${number}`;
+        }
+      }
+
+      setFormData(prev => ({ ...prev, salesAgentId: nextId }));
+    } catch (error) {
+      console.error('Error generating sales agent ID:', error);
+    }
+  };
+
+  // Auto-generate sales agent ID when component mounts
+  useEffect(() => {
+    generateSalesAgentId();
+  }, []);
 
   const generatePassword = () => {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
@@ -49,7 +85,16 @@ const ManageSalesAgents = ({ onNavigateToList }: ManageSalesAgentsProps) => {
         .single();
 
       if (userError) {
-        toast.error('Failed to create user account');
+        console.error('User creation error:', userError);
+        if (userError.code === '23505' && userError.message.includes('email')) {
+          toast.error('Email address already exists. Please use a different email.');
+        } else if (userError.code === '23505' && userError.message.includes('username')) {
+          toast.error('Sales Agent ID already exists. Please generate a new ID.');
+        } else if (userError.code === '42501') {
+          toast.error('Permission denied. Please ensure you are logged in as a user manager.');
+        } else {
+          toast.error('Failed to create user account: ' + userError.message);
+        }
         setLoading(false);
         return;
       }
@@ -66,7 +111,10 @@ const ManageSalesAgents = ({ onNavigateToList }: ManageSalesAgentsProps) => {
         });
 
       if (agentError) {
-        toast.error('Failed to create sales agent record');
+        console.error('Sales agent creation error:', agentError);
+        // Clean up user account if sales agent creation fails
+        await supabase.from('app_users').delete().eq('id', userData.id);
+        toast.error('Failed to create sales agent record: ' + agentError.message);
         setLoading(false);
         return;
       }
@@ -95,6 +143,8 @@ const ManageSalesAgents = ({ onNavigateToList }: ManageSalesAgentsProps) => {
       password: ''
     });
     setShowCredentials(false);
+    // Auto-generate new ID when resetting
+    generateSalesAgentId();
   };
 
   if (showCredentials) {
@@ -144,13 +194,23 @@ const ManageSalesAgents = ({ onNavigateToList }: ManageSalesAgentsProps) => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <label className="text-sm font-medium text-gray-700">Sales Agent ID</label>
-                <Input
-                  value={formData.salesAgentId}
-                  onChange={(e) => setFormData(prev => ({ ...prev, salesAgentId: e.target.value }))}
-                  placeholder="S101"
-                  className="h-10"
-                  required
-                />
+                <div className="flex gap-2">
+                  <Input
+                    value={formData.salesAgentId}
+                    placeholder="S101"
+                    className="h-10 bg-gray-50"
+                    readOnly
+                    required
+                  />
+                  <Button
+                    type="button"
+                    onClick={generateSalesAgentId}
+                    variant="outline"
+                    className="px-3"
+                  >
+                    Auto
+                  </Button>
+                </div>
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium text-gray-700">Sales Agent Name</label>

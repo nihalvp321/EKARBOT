@@ -127,9 +127,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       console.log('Attempting login with:', email);
       
       // First authenticate using our custom function
-      const { data: authResult, error: authError } = await supabase.rpc('authenticate_user', {
-        username_input: email.split('@')[0],
-        password_input: password
+      const { data: authResult, error: authError } = await supabase.rpc('authenticate_app_user', {
+        input_email: email,
+        input_password: password
       });
 
       if (authError || !authResult) {

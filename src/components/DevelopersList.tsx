@@ -52,13 +52,37 @@ const DevelopersList = ({ onNavigateToAdd }: DevelopersListProps) => {
 
   const toggleDeveloperStatus = async (id: string, currentStatus: boolean) => {
     try {
-      const { error } = await supabase
+      // First get the developer to find the linked user_id
+      const { data: developerData, error: fetchError } = await supabase
+        .from('developers')
+        .select('user_id')
+        .eq('id', id)
+        .single();
+
+      if (fetchError || !developerData?.user_id) {
+        toast.error('Failed to find linked user account');
+        return;
+      }
+
+      // Update both developers and app_users tables
+      const { error: devError } = await supabase
         .from('developers')
         .update({ is_active: !currentStatus })
         .eq('id', id);
 
-      if (error) {
+      if (devError) {
         toast.error('Failed to update developer status');
+        return;
+      }
+
+      // Update the app_users table as well
+      const { error: userError } = await supabase
+        .from('app_users')
+        .update({ is_active: !currentStatus })
+        .eq('id', developerData.user_id);
+
+      if (userError) {
+        toast.error('Failed to update user account status');
         return;
       }
 

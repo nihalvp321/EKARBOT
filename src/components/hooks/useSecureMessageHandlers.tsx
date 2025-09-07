@@ -22,7 +22,7 @@ const ALLOWED_FILE_TYPES = [
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
 
-export const useSecureMessageHandlers = (selectedContact: Contact | null) => {
+export const useSecureMessageHandlers = (selectedContact: Contact | null, setMessages?: React.Dispatch<React.SetStateAction<any[]>>) => {
   const [uploading, setUploading] = useState(false);
   const { user, session } = useSecureAuth();
 
@@ -119,13 +119,15 @@ export const useSecureMessageHandlers = (selectedContact: Contact | null) => {
         text: sanitizedText
       });
       
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('messages')
         .insert({
           sender_id: user.id,
           receiver_id: selectedContact.id,
           message_text: sanitizedText
-        });
+        })
+        .select('*, sender:app_users!messages_sender_id_fkey(username, user_type)')
+        .single();
 
       if (error) {
         console.error('Send message error:', error);
@@ -133,6 +135,11 @@ export const useSecureMessageHandlers = (selectedContact: Contact | null) => {
       }
       
       console.log('Message sent successfully');
+      
+      // Immediately add to local messages for instant feedback
+      if (setMessages && data) {
+        setMessages(prev => [...prev, data]);
+      }
     } catch (error) {
       console.error('Send message error:', error);
       toast.error('Failed to send message');
@@ -163,7 +170,7 @@ export const useSecureMessageHandlers = (selectedContact: Contact | null) => {
           
           const sanitizedCaption = caption ? sanitizeInput(caption) : '';
           
-          const { error } = await supabase
+          const { data, error } = await supabase
             .from('messages')
             .insert({
               sender_id: user.id,
@@ -173,7 +180,9 @@ export const useSecureMessageHandlers = (selectedContact: Contact | null) => {
               attachment_type: file.type,
               attachment_name: file.name,
               attachment_size: file.size
-            });
+            })
+            .select('*, sender:app_users!messages_sender_id_fkey(username, user_type)')
+            .single();
 
           if (error) {
             console.error('Insert message error:', error);
@@ -181,6 +190,12 @@ export const useSecureMessageHandlers = (selectedContact: Contact | null) => {
           }
           
           console.log('File message inserted successfully');
+          
+          // Immediately add to local messages for instant feedback
+          if (setMessages && data) {
+            setMessages(prev => [...prev, data]);
+          }
+          
           successCount++;
         } catch (fileError) {
           console.error('Error processing file:', file.name, fileError);
@@ -237,7 +252,7 @@ export const useSecureMessageHandlers = (selectedContact: Contact | null) => {
       
       const fileUrl = await uploadFile(file);
       
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('messages')
         .insert({
           sender_id: user.id,
@@ -247,7 +262,9 @@ export const useSecureMessageHandlers = (selectedContact: Contact | null) => {
           attachment_type: file.type,
           attachment_name: file.name,
           attachment_size: file.size
-        });
+        })
+        .select('*, sender:app_users!messages_sender_id_fkey(username, user_type)')
+        .single();
 
       if (error) {
         console.error('Insert voice message error:', error);
@@ -255,6 +272,12 @@ export const useSecureMessageHandlers = (selectedContact: Contact | null) => {
       }
       
       console.log('Voice message sent successfully');
+      
+      // Immediately add to local messages for instant feedback
+      if (setMessages && data) {
+        setMessages(prev => [...prev, data]);
+      }
+      
       toast.success('Voice message sent!');
     } catch (error) {
       console.error('Send voice error:', error);

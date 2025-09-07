@@ -8,6 +8,7 @@ import DevelopersList from '@/components/DevelopersList';
 import ManageSalesAgents from '@/components/ManageSalesAgents';
 import SalesAgentsList from '@/components/SalesAgentsList';
 import UserManagerInbox from '@/components/UserManagerInbox';
+import ProjectDropdownSettings from '@/components/ProjectDropdownSettings';
 
 const AppContent = () => {
   const [currentPage, setCurrentPage] = useState('developers');
@@ -30,8 +31,8 @@ const AppContent = () => {
     return <LoginPage />;
   }
 
-  // Allow access for user_manager type users
-  if (user.user_type !== 'user_manager') {
+  // Allow access for user_manager and sales_agent type users
+  if (user.user_type !== 'user_manager' && user.user_type !== 'sales_agent') {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -55,6 +56,8 @@ const AppContent = () => {
         return <SalesAgentsList onNavigateToAdd={() => setCurrentPage('sales-agents')} />;
       case 'inbox':
         return <UserManagerInbox />;
+      case 'settings':
+        return <ProjectDropdownSettings />;
       default:
         return <ManageDevelopers onNavigateToList={() => setCurrentPage('developers-list')} />;
     }

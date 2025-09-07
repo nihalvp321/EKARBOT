@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useDeveloperAuth } from '@/hooks/useDeveloperAuth';
+import DocumentAutofill from '../DocumentAutofill';
 import ProjectBasicInfo from './ProjectBasicInfo';
 import ProjectLocationDetails from './ProjectLocationDetails';
 import ProjectUnitDetails from './ProjectUnitDetails';
@@ -63,7 +64,7 @@ interface ProjectFormContainerProps {
 }
 
 const ProjectFormContainer = ({ editProject, onSave, autoFillData }: ProjectFormContainerProps) => {
-  const { profile } = useDeveloperAuth();
+  const { profile, user } = useDeveloperAuth();
   const [currentStep, setCurrentStep] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -120,11 +121,31 @@ const ProjectFormContainer = ({ editProject, onSave, autoFillData }: ProjectForm
         price_per_sqft: editProject.price_per_sqft || 0,
         service_charges: editProject.service_charges || 0,
         payment_plan: editProject.payment_plan || '',
-        contacts: editProject.sales_contact_name ? [{
-          name: editProject.sales_contact_name || '',
-          phone: editProject.sales_phone || '',
-          email: editProject.sales_email || ''
-        }] : [{ name: '', phone: '', email: '' }],
+        contacts: (() => {
+          let contacts = editProject.contacts;
+          // Parse JSON string if necessary
+          if (typeof contacts === 'string') {
+            try {
+              contacts = JSON.parse(contacts);
+            } catch (e) {
+              contacts = null;
+            }
+          }
+          // Check if we have valid contacts array
+          if (Array.isArray(contacts) && contacts.length > 0) {
+            return contacts;
+          }
+          // Fallback to sales contact info
+          if (editProject.sales_contact_name) {
+            return [{
+              name: editProject.sales_contact_name || '',
+              phone: editProject.sales_phone || '',
+              email: editProject.sales_email || ''
+            }];
+          }
+          // Default empty contact
+          return [{ name: '', phone: '', email: '' }];
+        })(),
         cover_image: editProject.cover_image_url || '',
         gallery_images: editProject.gallery_images || [],
         brochure_pdf: editProject.brochure_url || '',
@@ -182,6 +203,14 @@ const ProjectFormContainer = ({ editProject, onSave, autoFillData }: ProjectForm
     }
   }, [autoFillData, profile?.developer_name]);
 
+  const handleAutoFillData = (extractedData: any) => {
+    setFormData(prev => ({
+      ...prev,
+      developer_name: profile?.developer_name || prev.developer_name,
+      ...extractedData
+    }));
+  };
+
   const handleInputChange = (field: string, value: string | boolean | string[] | any[] | ContactInfo[]) => {
     setFormData(prev => ({
       ...prev,
@@ -238,10 +267,13 @@ const ProjectFormContainer = ({ editProject, onSave, autoFillData }: ProjectForm
       return;
     }
 
+    console.log('Profile data:', profile);
+    console.log('Available profile fields:', Object.keys(profile || {}));
+    
     setIsSubmitting(true);
     try {
       if (!profile?.id) {
-        toast.error("You must be logged in as a developer to submit a project.");
+        toast.error("Developer profile not found. Please contact support.");
         return;
       }
 
@@ -276,6 +308,7 @@ const ProjectFormContainer = ({ editProject, onSave, autoFillData }: ProjectForm
         video_tour_url: formData.video_tour_url,
         other_documents: formData.other_documents,
         amenities: formData.amenities,
+        contacts: JSON.stringify(formData.contacts),
         sales_contact_name: firstContact.name,
         sales_email: firstContact.email,
         sales_phone: firstContact.phone,
@@ -294,10 +327,13 @@ const ProjectFormContainer = ({ editProject, onSave, autoFillData }: ProjectForm
         bathrooms_range: formData.bathrooms_range,
         furnishing_status: formData.furnishing_status,
         has_balcony: formData.has_balcony,
-        developer_id: profile.id,
-        user_id: profile.user_id,
+        developer_id: profile?.id, // This must be the UUID from developers table
+        user_id: user?.id,
         source: 'app data'
       };
+
+      console.log('About to insert project data:', projectData);
+      console.log('Profile ID being used:', profile?.id || user?.id);
 
       let result;
       if (editProject) {
@@ -383,16 +419,11 @@ const ProjectFormContainer = ({ editProject, onSave, autoFillData }: ProjectForm
       title: 'Pricing & Financials',
       component: <ProjectPricingDetails formData={formData} handleInputChange={handleInputChange} />
     },
-  {
-  id: 'contact',
-  title: 'Contact Information',
-  component: (
-    <ProjectContactInfo
-      formData={{ contacts: formData.contacts || [{ name: '', phone: '', email: '' }] }}
-      handleInputChange={(field, value) => handleInputChange(field, value)}
-    />
-  )
-},
+    {
+      id: 'contact',
+      title: 'Contact Information',
+      component: <ProjectContactInfo formData={formData} handleInputChange={handleInputChange} />
+    },
     {
       id: 'media',
       title: 'Media Upload',
@@ -403,6 +434,10 @@ const ProjectFormContainer = ({ editProject, onSave, autoFillData }: ProjectForm
   return (
     <div className="max-w-4xl mx-auto p-6">
       <h2 className="text-2xl font-bold mb-4">{editProject ? 'Edit Project' : 'Add New Project'}</h2>
+
+      {!editProject && (
+        <DocumentAutofill onAutoFillData={handleAutoFillData} />
+      )}
 
       <div className="mb-6">
         <div className="flex justify-between items-center mb-2">

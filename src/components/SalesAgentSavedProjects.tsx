@@ -5,7 +5,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
-  BookmarkCheck, Building, DollarSign, Eye, MapPin
+  BookmarkCheck, Building, DollarSign, Eye, MapPin, Heart
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useSalesAgentAuth } from '@/hooks/useSalesAgentAuth';
@@ -16,27 +16,32 @@ const SavedProjectsPage = () => {
   const [savedProjects, setSavedProjects] = useState<any[]>([]);
   const [savedProjectIds, setSavedProjectIds] = useState<string[]>([]);
   const [selectedProject, setSelectedProject] = useState<any>(null);
-  const [visibleCount, setVisibleCount] = useState(3);
+  const [visibleCount, setVisibleCount] = useState(6);
+  const [loading, setLoading] = useState(true);
 
   const { profile } = useSalesAgentAuth();
 
   const fetchSavedProjects = async () => {
     if (!profile?.sales_agent_id) return;
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('saved_projects')
+        .select('project_id, projects (*)')
+        .eq('sales_agent_id', profile.sales_agent_id);
 
-    const { data, error } = await supabase
-      .from('saved_projects')
-      .select('project_id, projects (*)')
-      .eq('sales_agent_id', profile.sales_agent_id);
+      if (error) throw error;
 
-    if (error) {
+      const projects = (data || []).map((item: any) => item.projects).filter(Boolean);
+      const ids = (data || []).map((item: any) => item.project_id);
+      setSavedProjects(projects);
+      setSavedProjectIds(ids);
+    } catch (err) {
+      console.error(err);
       toast.error('Failed to load saved projects');
-      return;
+    } finally {
+      setLoading(false);
     }
-
-    const projects = (data || []).map((item: any) => item.projects).filter(Boolean);
-    const ids = (data || []).map((item: any) => item.project_id);
-    setSavedProjects(projects);
-    setSavedProjectIds(ids);
   };
 
   const handleUnsaveProject = async (projectId: string) => {
@@ -67,116 +72,155 @@ const SavedProjectsPage = () => {
   const visibleProjects = savedProjects.slice(0, visibleCount);
 
   return (
-    <div className="space-y-6 px-4 md:px-8 pb-10">
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-xl font-semibold">Your Saved Projects</CardTitle>
-        </CardHeader>
-      </Card>
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50">
+      {/* Header Section */}
+      <div className="bg-white shadow-sm border-b">
+        <div className="max-w-7xl mx-auto px-4 py-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3 animate-fade-in">
+                <Heart className="h-8 w-8 text-pink-500 animate-pulse" />
+                Your Saved Projects
+              </h1>
+              <p className="text-gray-600 mt-2">
+                {savedProjects.length} saved {savedProjects.length === 1 ? 'project' : 'projects'}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
 
-      {savedProjects.length === 0 ? (
-        <p className="text-center text-gray-500">No saved projects yet.</p>
-      ) : (
-        <>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {visibleProjects.map((project) => {
-              const isSaved = savedProjectIds.includes(project.project_id);
+      <div className="max-w-7xl mx-auto px-4 py-8">
+        {loading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="animate-pulse rounded-2xl bg-gray-200 h-80"></div>
+            ))}
+          </div>
+        ) : savedProjects.length === 0 ? (
+          <div className="text-center py-20">
+            <div className="bg-white rounded-2xl shadow-lg p-12 max-w-md mx-auto animate-fade-in">
+              <Heart className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+              <h3 className="text-xl font-semibold text-gray-800 mb-2">No saved projects yet</h3>
+              <p className="text-gray-500">Start exploring and save projects that interest you!</p>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {visibleProjects.map((project, index) => (
+                <Card
+                  key={project.project_id}
+                  className="relative border-0 rounded-2xl overflow-hidden shadow-xl bg-white hover:shadow-2xl transform transition-all duration-500 hover:scale-105 animate-fade-in-up"
+                  style={{ animationDelay: `${index * 100}ms` }}
+                >
+                  <div className="absolute top-4 left-4 flex flex-wrap items-center gap-2 z-10">
+                    {project.listing_type && (
+                      <Badge className="text-xs px-3 py-1 bg-gradient-to-r from-blue-500 to-blue-600 text-white capitalize shadow-lg rounded-full">
+                        {project.listing_type}
+                      </Badge>
+                    )}
+                    {project.project_status && (
+                      <Badge
+                        className={`text-xs px-3 py-1 shadow-lg rounded-full ${
+                          project.project_status === 'Ready'
+                            ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white'
+                            : 'bg-gradient-to-r from-yellow-500 to-orange-500 text-white'
+                        }`}
+                      >
+                        {project.project_status}
+                      </Badge>
+                    )}
+                  </div>
 
-              return (
-                <Card key={project.project_id} className="relative border rounded-xl overflow-hidden">
                   {project.cover_image_url ? (
-                    <img
-                      src={project.cover_image_url}
-                      alt={project.project_title}
-                      className="w-full h-48 object-cover"
-                    />
+                    <div className="relative overflow-hidden">
+                      <img
+                        src={project.cover_image_url}
+                        alt={project.project_title}
+                        className="w-full h-52 object-cover transition-transform duration-500 hover:scale-110"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent"></div>
+                    </div>
                   ) : (
-                    <div className="w-full h-48 flex items-center justify-center bg-gray-200">
-                      <Building className="h-10 w-10 text-gray-500" />
+                    <div className="w-full h-52 flex items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200">
+                      <Building className="h-16 w-16 text-gray-400" />
                     </div>
                   )}
-<div className="absolute top-3 left-3 flex flex-wrap items-center gap-2 z-10">
-    {project.listing_type && (
-      <Badge className="text-xs px-2 py-1 bg-blue-600 text-white capitalize shadow">
-        {project.listing_type}
-      </Badge>
-    )}
-    {project.project_status && (
-      <Badge
-        className={`text-xs px-2 py-1 shadow ${
-          project.project_status === 'Ready'
-            ? 'bg-green-600 text-white'
-            : 'bg-yellow-500 text-white'
-        }`}
-      >
-        {project.project_status}
-      </Badge>
-    )}
-  </div>
-                  <CardHeader className="p-4 pb-2">
-                    <CardTitle className="text-base font-semibold">
+
+                  <CardHeader className="p-5 pb-3">
+                    <CardTitle className="text-lg font-bold text-gray-800 line-clamp-2">
                       {project.project_title}
                     </CardTitle>
-                    <span>{project.developer_name}</span>
-                    <div className="text-xs text-gray-500 flex items-center gap-2">
-                      <Badge className="text-xs px-2 py-1 bg-gray-700 text-white capitalize">
+                    <p className="text-purple-600 font-semibold">{project.developer_name}</p>
+                    <div className="flex items-center gap-2 mt-2">
+                      <Badge className="text-xs px-3 py-1 bg-gradient-to-r from-gray-600 to-gray-700 text-white capitalize rounded-full">
                         {project.source}
                       </Badge>
-                      <span className="text-gray-400">|</span>
-                      <span>{project.project_type}</span>
+                      <Badge variant="outline" className="text-xs px-3 py-1 border-gray-300 text-gray-600 rounded-full">
+                        {project.project_type}
+                      </Badge>
                     </div>
                   </CardHeader>
 
-                  <CardContent className="space-y-2 text-sm text-gray-700 px-4 pb-4">
-                    <div className="flex items-center gap-2">
-                      <MapPin className="h-4 w-4" />
-                      <span>{project.city || 'Unknown'}</span>
+                  <CardContent className="space-y-3 text-sm text-gray-700 px-5 pb-5">
+                    <div className="flex items-center gap-2 text-gray-600">
+                      <MapPin className="h-4 w-4 text-red-500" />
+                      <span className="font-medium">{project.city || 'Unknown Location'}</span>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <DollarSign className="h-4 w-4" />
-                      <span>AED {project.starting_price_aed?.toLocaleString()}</span>
+                    <div className="flex items-center gap-2 text-gray-600">
+                      <DollarSign className="h-4 w-4 text-green-500" />
+                      <span className="font-bold text-green-600">
+                        AED {project.starting_price_aed?.toLocaleString() || 'Price on request'}
+                      </span>
                     </div>
 
-                    <div className="flex gap-2 pt-2 items-center">
+                    <div className="flex gap-2 pt-3 items-center">
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => setSelectedProject(project)}
-                        className="border-neutral-400 text-neutral-700"
+                        className="flex-1 border-gray-300 text-gray-700 hover:bg-blue-50 hover:border-blue-300 rounded-xl transition-all duration-300"
                       >
-                        <Eye className="h-4 w-4 mr-1" /> View Details
+                        <Eye className="h-4 w-4 mr-2" /> 
+                        Details
                       </Button>
                       <Button
                         variant="ghost"
                         size="icon"
                         onClick={() => handleUnsaveProject(project.project_id)}
+                        className="rounded-xl transition-all duration-300 transform hover:scale-110 text-pink-600 bg-pink-50 hover:bg-pink-100"
                       >
-                        <BookmarkCheck className="h-5 w-5 text-pink-600" />
+                        <BookmarkCheck className="h-5 w-5" />
                       </Button>
                     </div>
 
                     <a
                       href={project.url}
                       target="_blank"
-                      className="text-xs text-blue-600 underline pt-1 block"
+                      rel="noopener noreferrer"
+                      className="text-xs text-blue-600 hover:text-blue-800 underline transition-colors duration-200 block"
                     >
-                      Full Details ↗
+                      View Original Listing ↗
                     </a>
                   </CardContent>
                 </Card>
-              );
-            })}
-          </div>
-
-          {visibleCount < savedProjects.length && (
-            <div className="text-center mt-6">
-              <Button onClick={() => setVisibleCount((prev) => prev + 3)}>
-                View More
-              </Button>
+              ))}
             </div>
-          )}
-        </>
-      )}
+
+            {visibleCount < savedProjects.length && (
+              <div className="text-center mt-12">
+                <Button 
+                  onClick={() => setVisibleCount(prev => prev + 6)}
+                  className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white px-8 py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transform transition-all duration-300 hover:scale-105"
+                >
+                  Load More Projects
+                </Button>
+              </div>
+            )}
+          </>
+        )}
+      </div>
 
       {selectedProject && (
         <ProjectDetailModal

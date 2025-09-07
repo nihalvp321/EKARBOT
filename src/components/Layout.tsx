@@ -1,8 +1,10 @@
-import * as React from 'react';
+
 import { useState, useEffect } from 'react';
 import { useSecureAuth } from '@/hooks/useSecureAuth';
 import { Button } from '@/components/ui/button';
-import { Users, UserPlus, MessageSquare, Menu, X, LogOut } from 'lucide-react';
+import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { Users, UserPlus, MessageSquare, Menu, X, LogOut, Settings } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
 interface LayoutProps {
@@ -12,7 +14,7 @@ interface LayoutProps {
 }
 
 const Layout = ({ children, currentPage, onNavigate }: LayoutProps) => {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const { user, signOut } = useSecureAuth();
 
@@ -88,10 +90,10 @@ const Layout = ({ children, currentPage, onNavigate }: LayoutProps) => {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="lg:hidden"
-            >
-              {sidebarOpen ? <X /> : <Menu />}
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            className="lg:hidden"
+          >
+            {isMobileMenuOpen ? <X /> : <Menu />}
             </Button>
             <div className="flex items-center">
               <img 
@@ -103,21 +105,38 @@ const Layout = ({ children, currentPage, onNavigate }: LayoutProps) => {
           </div>
           
           {/* Logout Button in Header */}
-          <Button
-            onClick={handleLogout}
-            variant="ghost"
-            size="sm"
-            className="flex items-center space-x-2 text-red-600 hover:bg-red-50"
-          >
-            <LogOut size={18} />
-            <span className="hidden sm:inline">Logout</span>
-          </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="flex items-center space-x-2 text-red-600 hover:bg-red-50"
+              >
+                <LogOut size={18} />
+                <span className="hidden sm:inline">Logout</span>
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Confirm Logout</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Are you sure you want to log out? You will need to sign in again to access your account.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleLogout}>
+                  Logout
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       </div>
 
       <div className="flex">
         {/* Sidebar - Always visible on desktop, toggleable on mobile */}
-        <div className={`${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 fixed lg:static inset-y-0 left-0 z-40 w-64 bg-white border-r border-gray-200 transition-transform duration-300 ease-in-out`} style={{ top: '88px' }}>
+        <div className={`${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 fixed lg:static inset-y-0 left-0 z-40 w-64 bg-white border-r border-gray-200 transition-transform duration-300 ease-in-out`} style={{ top: '88px' }}>
           <div className="h-full flex flex-col">
             <nav className="px-3 py-4 space-y-1 flex-1 overflow-y-auto">
               {menuItems.map((item) => {
@@ -131,7 +150,7 @@ const Layout = ({ children, currentPage, onNavigate }: LayoutProps) => {
                     key={item.id}
                     onClick={() => {
                       onNavigate(item.id);
-                      setSidebarOpen(false);
+                      setIsMobileMenuOpen(false);
                     }}
                     className={`w-full flex items-center space-x-3 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
                       isActive
@@ -154,10 +173,10 @@ const Layout = ({ children, currentPage, onNavigate }: LayoutProps) => {
         </div>
 
         {/* Overlay for mobile */}
-        {sidebarOpen && (
+        {isMobileMenuOpen && (
           <div
             className="fixed inset-0 bg-black bg-opacity-50 z-30 lg:hidden"
-            onClick={() => setSidebarOpen(false)}
+            onClick={() => setIsMobileMenuOpen(false)}
             style={{ top: '88px' }}
           />
         )}

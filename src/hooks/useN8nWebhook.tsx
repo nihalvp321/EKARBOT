@@ -33,7 +33,7 @@ export const useN8nWebhook = () => {
 
       console.log('Request body being sent:', JSON.stringify(requestBody, null, 2));
 
-      const webhookUrl = 'https://shafil.app.n8n.cloud/webhook-test/recommend-projects';
+      const webhookUrl = 'http://13.60.204.7:5678/webhook/recommend-projects';
       console.log('Using webhook URL:', webhookUrl);
 
       const response = await fetch(webhookUrl, {

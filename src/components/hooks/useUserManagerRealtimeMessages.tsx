@@ -1,4 +1,4 @@
-import * as React from 'react';
+
 import { useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useSecureAuth } from '@/hooks/useSecureAuth';
@@ -49,7 +49,15 @@ export const useUserManagerRealtimeMessages = (
         },
         (payload) => {
           const newMessage = payload.new as Message;
-          setMessages(prev => [...prev, newMessage]);
+          
+          // Only add the message if it's not already in the state (avoid duplicates from local additions)
+          setMessages(prev => {
+            const messageExists = prev.some(msg => msg.id === newMessage.id);
+            if (messageExists) {
+              return prev;
+            }
+            return [...prev, newMessage];
+          });
           
           // Mark as read if we're the receiver
           if (newMessage.receiver_id === user.id) {

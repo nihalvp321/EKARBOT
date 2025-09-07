@@ -80,12 +80,17 @@ export const validateSalesAgentCredentials = async (salesAgentId: string, passwo
       .from('sales_agents')
       .select('*')
       .eq('sales_agent_id', salesAgentId.trim())
-      .eq('is_active', true)
       .single();
 
     if (agentError || !agentData) {
       await logSecurityEvent('failed_sales_agent_login', { sales_agent_id: salesAgentId, reason: 'agent_not_found' });
       return { success: false, error: 'Invalid Sales Agent ID or password' };
+    }
+
+    // Check if sales agent account is active
+    if (!agentData.is_active) {
+      await logSecurityEvent('failed_sales_agent_login', { sales_agent_id: salesAgentId, reason: 'agent_deactivated' });
+      return { success: false, error: 'Your account has been deactivated by the administrator. Please contact support.' };
     }
 
     // Check if the sales agent has a linked user_id

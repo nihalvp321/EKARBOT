@@ -107,13 +107,13 @@ const SalesAgentChatBot = () => {
 const getWebhookUrl = () => {
   switch (chatMode) {
     case 'inhouse':
-      return 'https://shafil.app.n8n.cloud/webhook-test/recommend-projects';
+      return 'https://ekarbotproject.duckdns.org/webhook/inhouse';
     case 'chatgpt':
-      return 'https://shafil.app.n8n.cloud/webhook-test/chatgpt';
+      return 'https://ekarbotproject.duckdns.org/webhook/chatgpt';
     case 'hybrid':
       return 'https://ekarbotproject.duckdns.org/webhook/hybrid';
     case 'property-listing':
-      return 'https://shafil.app.n8n.cloud/webhook-test/property-listing';
+      return 'https://ekarbotproject.duckdns.org/webhook/property-listing';
     default:
       return '';
   }

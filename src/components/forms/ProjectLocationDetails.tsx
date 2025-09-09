@@ -14,12 +14,14 @@ const ProjectLocationDetails = ({ formData, handleInputChange }: ProjectLocation
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-lg font-semibold text-gray-800">Location Details</CardTitle>
+        <CardTitle className="text-lg font-semibold text-gray-800"><h4 className="text-sm font-bold text-gray-800 uppercase tracking-wide mb-5 flex items-center">
+        <span className="w-1.5 h-1.5 bg-blue-600 rounded-full mr-2"></span>
+      Location Details</h4></CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <Label htmlFor="emirate">Emirate *</Label>
+            <Label htmlFor="emirate">Emirate <span className="text-red-500">*</span></Label>
             <Select value={formData.emirate || ''} onValueChange={(value) => handleInputChange('emirate', value)}>
               <SelectTrigger>
                 <SelectValue placeholder="Select emirate" />
@@ -36,7 +38,7 @@ const ProjectLocationDetails = ({ formData, handleInputChange }: ProjectLocation
             </Select>
           </div>
           <div>
-            <Label htmlFor="region_area">Region/Area *</Label>
+            <Label htmlFor="region_area">Region/Area <span className="text-red-500">*</span></Label>
             <Input
               id="region_area"
               value={formData.region_area || ''}
@@ -48,7 +50,7 @@ const ProjectLocationDetails = ({ formData, handleInputChange }: ProjectLocation
         </div>
 
         <div>
-          <Label htmlFor="location_description">Location Description *</Label>
+          <Label htmlFor="location_description">Location Description <span className="text-red-500">*</span></Label>
           <Textarea
             id="location_description"
             value={formData.location_description || ''}

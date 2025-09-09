@@ -12,7 +12,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { 
   Plus, 
@@ -35,6 +34,7 @@ interface DropdownOption {
   value: string;
   category: string;
   display_order: number;
+  is_active: boolean;
 }
 
 const DeveloperSettings = () => {
@@ -47,7 +47,7 @@ const DeveloperSettings = () => {
   const [itemToDelete, setItemToDelete] = useState<{ id: string; value: string } | null>(null);
 
   const categories = [
-    { key: 'project_type', label: 'Project Type', icon: Building },
+    { key: 'project_subtype', label: 'Project Subtype', icon: Building },
     { key: 'listing_type', label: 'Listing Type', icon: Tag },
     { key: 'project_status', label: 'Completion Status', icon: Tag },
     { key: 'bedroom_range', label: 'Bedroom Range', icon: Home },
@@ -59,6 +59,7 @@ const DeveloperSettings = () => {
 
   const fetchDropdownOptions = async () => {
     try {
+      console.log('fetchDropdownOptions called');
       setLoading(true);
       const { data, error } = await supabase
         .from('dropdown_settings')
@@ -67,18 +68,22 @@ const DeveloperSettings = () => {
         .order('category', { ascending: true })
         .order('display_order', { ascending: true });
 
+      console.log('Fetch dropdown options response:', { data: data?.length, error });
+
       if (error) {
         console.error('Error fetching dropdown options:', error);
         toast.error('Failed to fetch dropdown options');
         return;
       }
 
+      console.log('Setting dropdown options:', data?.length || 0, 'items');
       setDropdownOptions(data || []);
     } catch (error) {
       console.error('Error fetching dropdown options:', error);
       toast.error('An error occurred while fetching dropdown options');
     } finally {
       setLoading(false);
+      console.log('Fetch completed, loading set to false');
     }
   };
 
@@ -127,40 +132,119 @@ const DeveloperSettings = () => {
   };
 
   const handleEditOption = (option: DropdownOption) => {
+    console.log('Edit button clicked for option:', option);
+    console.log('Current editingOption state before:', editingOption);
     setEditingOption({ ...option });
+    console.log('Edit option state set to:', { ...option });
   };
 
   const handleUpdateOption = async () => {
+    console.log('handleUpdateOption called with editingOption:', editingOption);
+    
     if (!editingOption || !editingOption.value.trim()) {
+      console.log('Validation failed: missing editingOption or value');
       toast.error('Value is required');
       return;
     }
 
+    // Get the original option from the current state
+    const originalOption = dropdownOptions.find(opt => opt.id === editingOption.id);
+    console.log('Original option found:', originalOption);
+    
+    if (!originalOption) {
+      console.log('Original option not found');
+      toast.error('Original option not found');
+      return;
+    }
+
+    // Check if the new value is the same as the original (case-insensitive)
+    if (originalOption.value.toLowerCase() === editingOption.value.trim().toLowerCase()) {
+      console.log('No changes detected, closing dialog');
+      setEditingOption(null);
+      toast.info('No changes made');
+      return;
+    }
+
+    // Check if another option with the same category and value already exists
+    const duplicateOption = dropdownOptions.find(opt => 
+      opt.id !== editingOption.id && 
+      opt.category === editingOption.category && 
+      opt.value.toLowerCase() === editingOption.value.trim().toLowerCase() &&
+      opt.is_active !== false
+    );
+    console.log('Duplicate check result:', duplicateOption);
+
+    if (duplicateOption) {
+      console.log('Duplicate found, showing error');
+      toast.error(`An option with the value "${editingOption.value.trim()}" already exists in this category`);
+      return;
+    }
+
+    console.log('Starting database update...');
     setSavingStates(prev => ({ ...prev, [`edit_${editingOption.id}`]: true }));
 
     try {
+      console.log('Calling supabase update with:', {
+        id: editingOption.id,
+        value: editingOption.value.trim(),
+        category: editingOption.category
+      });
+
+      // First, let's fetch the current record to make sure it exists
+      const { data: currentRecord, error: fetchError } = await supabase
+        .from('dropdown_settings')
+        .select('*')
+        .eq('id', editingOption.id)
+        .eq('is_active', true)
+        .single();
+
+      if (fetchError || !currentRecord) {
+        console.error('Failed to fetch current record:', fetchError);
+        toast.error('Failed to find the option to update');
+        return;
+      }
+
+      console.log('Current record:', currentRecord);
+
+      // Now update only if the value is actually different
       const { data, error } = await supabase
         .from('dropdown_settings')
         .update({
           value: editingOption.value.trim(),
+          updated_at: new Date().toISOString()
         })
         .eq('id', editingOption.id)
+        .eq('is_active', true)
         .select()
-        .maybeSingle();
+        .single();
+
+      console.log('Supabase update response:', { data, error });
 
       if (error) {
-        console.error('Error updating option:', error);
-        toast.error('Failed to update option');
+        console.error('Database error:', error);
+        if (error.code === '23505') {
+          toast.error('This value already exists in this category. Please choose a different value.');
+        } else {
+          toast.error('Failed to update option: ' + error.message);
+        }
         return;
       }
 
+      if (!data) {
+        console.log('No data returned from update');
+        toast.error('Failed to update option - no data returned');
+        return;
+      }
+
+      console.log('Update successful, refreshing data...');
       await fetchDropdownOptions();
       setEditingOption(null);
-      toast.success(`Option updated successfully`);
+      toast.success(`Option updated successfully to "${data.value}"`);
     } catch (error) {
-      console.error('Error updating option:', error);
+      console.error('Catch block error:', error);
       toast.error('An error occurred while updating the option');
     } finally {
+      console.log('Clearing saving state...');
       setSavingStates(prev => ({ ...prev, [`edit_${editingOption.id}`]: false }));
     }
   };
@@ -171,12 +255,16 @@ const DeveloperSettings = () => {
     try {
       const { error } = await supabase
         .from('dropdown_settings')
-        .update({ is_active: false })
-        .eq('id', optionId);
+        .update({ 
+          is_active: false,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', optionId)
+        .eq('is_active', true);
 
       if (error) {
         console.error('Error deleting option:', error);
-        toast.error('Failed to delete option');
+        toast.error('Failed to delete option: ' + error.message);
         return;
       }
 
@@ -201,10 +289,6 @@ const DeveloperSettings = () => {
     if (itemToDelete) {
       handleDeleteOption(itemToDelete.id, itemToDelete.value);
     }
-  };
-
-  const cancelEdit = () => {
-    setEditingOption(null);
   };
 
   if (loading) {
@@ -242,6 +326,211 @@ const DeveloperSettings = () => {
           const CategoryIcon = category.icon;
           const options = getOptionsForCategory(category.key);
           
+          // Special handling for project_subtype to show grouped view
+          if (category.key === 'project_subtype') {
+            const residentialOptions = options.filter(opt => 
+              ['Apartments', 'Apartment', 'Villa', 'Townhouses', 'Townhouse', 'Duplex', 'Penthouse', 'Studios', 'Studio'].includes(opt.value)
+            );
+            const commercialOptions = options.filter(opt => 
+              ['Office Space', 'Retail Shop', 'Showroom', 'Warehouses', 'Warehouse', 'Industrial Unit', 'Hotel Apartment'].includes(opt.value)
+            );
+            
+            return (
+              <Card key={category.key} className="shadow-sm">
+                <CardHeader className="pb-4">
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <CategoryIcon className="h-5 w-5" style={{ color: '#455560' }} />
+                    {category.label}
+                    <Badge variant="outline" className="ml-auto">
+                      {options.length} options
+                    </Badge>
+                  </CardTitle>
+                  <p className="text-sm text-gray-600 mt-2">
+                    Manage subtypes for Residential and Commercial projects. These will be filtered based on Project Type selection.
+                  </p>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {/* Residential Subtypes Section */}
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2 text-sm font-semibold text-green-700 bg-green-50 px-3 py-2 rounded">
+                      <Home className="h-4 w-4" />
+                      Residential Subtypes
+                      <Badge variant="outline" className="ml-auto text-green-700 border-green-300">
+                        {residentialOptions.length} options
+                      </Badge>
+                    </div>
+                    
+                    {/* Add New Residential Option */}
+                    <div className="flex gap-2 p-4 bg-green-50 rounded-lg border-2 border-dashed border-green-200">
+                      <Input
+                        placeholder="Add residential subtype (e.g., Apartment, Villa)"
+                        value={newOption.category === `${category.key}_residential` ? newOption.value : ''}
+                        onChange={(e) => setNewOption(prev => ({ 
+                          ...prev, 
+                          value: e.target.value,
+                          category: `${category.key}_residential`
+                        }))}
+                        onKeyPress={(e) => {
+                          if (e.key === 'Enter') {
+                            handleAddOption(category.key);
+                          }
+                        }}
+                        className="flex-1"
+                      />
+                      <Button
+                        onClick={() => handleAddOption(category.key)}
+                        disabled={savingStates[`add_${category.key}`] || !newOption.value.trim() || newOption.category !== `${category.key}_residential`}
+                        style={{ backgroundColor: '#455560' }}
+                        className="text-white hover:opacity-90 disabled:opacity-50"
+                      >
+                        {savingStates[`add_${category.key}`] ? (
+                          <>Adding...</>
+                        ) : (
+                          <>
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add
+                          </>
+                        )}
+                      </Button>
+                    </div>
+
+                    {/* Residential Options List */}
+                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                      {residentialOptions.map((option) => (
+                        <div key={option.id} className="flex items-center gap-3 p-3 border rounded-lg bg-white hover:bg-gray-50 transition-colors">
+                          <Badge 
+                            variant="outline" 
+                            className="font-mono text-xs min-w-[60px] justify-center bg-green-50 text-green-700 border-green-300 shrink-0"
+                          >
+                            {option.code}
+                          </Badge>
+                          <span className="flex-1 text-sm font-medium">{option.value}</span>
+                          <div className="flex gap-1">
+                            <Button
+                              onClick={() => handleEditOption(option)}
+                              size="sm"
+                              variant="ghost"
+                              className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                            >
+                              <Edit2 className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              onClick={() => openDeleteDialog(option.id, option.value)}
+                              disabled={savingStates[`delete_${option.id}`]}
+                              size="sm"
+                              variant="ghost"
+                              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                            >
+                              {savingStates[`delete_${option.id}`] ? (
+                                <>Deleting...</>
+                              ) : (
+                                <Trash2 className="h-4 w-4" />
+                              )}
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                      {residentialOptions.length === 0 && (
+                        <p className="text-sm text-gray-500 italic text-center py-4">
+                          No residential subtypes configured
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Commercial Subtypes Section */}
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2 text-sm font-semibold text-blue-700 bg-blue-50 px-3 py-2 rounded">
+                      <Building className="h-4 w-4" />
+                      Commercial Subtypes
+                      <Badge variant="outline" className="ml-auto text-blue-700 border-blue-300">
+                        {commercialOptions.length} options
+                      </Badge>
+                    </div>
+                    
+                    {/* Add New Commercial Option */}
+                    <div className="flex gap-2 p-4 bg-blue-50 rounded-lg border-2 border-dashed border-blue-200">
+                      <Input
+                        placeholder="Add commercial subtype (e.g., Office Space, Retail Shop)"
+                        value={newOption.category === `${category.key}_commercial` ? newOption.value : ''}
+                        onChange={(e) => setNewOption(prev => ({ 
+                          ...prev, 
+                          value: e.target.value,
+                          category: `${category.key}_commercial`
+                        }))}
+                        onKeyPress={(e) => {
+                          if (e.key === 'Enter') {
+                            handleAddOption(category.key);
+                          }
+                        }}
+                        className="flex-1"
+                      />
+                      <Button
+                        onClick={() => handleAddOption(category.key)}
+                        disabled={savingStates[`add_${category.key}`] || !newOption.value.trim() || newOption.category !== `${category.key}_commercial`}
+                        style={{ backgroundColor: '#455560' }}
+                        className="text-white hover:opacity-90 disabled:opacity-50"
+                      >
+                        {savingStates[`add_${category.key}`] ? (
+                          <>Adding...</>
+                        ) : (
+                          <>
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add
+                          </>
+                        )}
+                      </Button>
+                    </div>
+
+                    {/* Commercial Options List */}
+                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                      {commercialOptions.map((option) => (
+                        <div key={option.id} className="flex items-center gap-3 p-3 border rounded-lg bg-white hover:bg-gray-50 transition-colors">
+                          <Badge 
+                            variant="outline" 
+                            className="font-mono text-xs min-w-[60px] justify-center bg-blue-50 text-blue-700 border-blue-300 shrink-0"
+                          >
+                            {option.code}
+                          </Badge>
+                          <span className="flex-1 text-sm font-medium">{option.value}</span>
+                          <div className="flex gap-1">
+                            <Button
+                              onClick={() => handleEditOption(option)}
+                              size="sm"
+                              variant="ghost"
+                              className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                            >
+                              <Edit2 className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              onClick={() => openDeleteDialog(option.id, option.value)}
+                              disabled={savingStates[`delete_${option.id}`]}
+                              size="sm"
+                              variant="ghost"
+                              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                            >
+                              {savingStates[`delete_${option.id}`] ? (
+                                <>Deleting...</>
+                              ) : (
+                                <Trash2 className="h-4 w-4" />
+                              )}
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                      {commercialOptions.length === 0 && (
+                        <p className="text-sm text-gray-500 italic text-center py-4">
+                          No commercial subtypes configured
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          }
+          
+          // Regular category display for all other categories
           return (
             <Card key={category.key} className="shadow-sm">
               <CardHeader className="pb-4">
@@ -257,6 +546,7 @@ const DeveloperSettings = () => {
                 {/* Add New Option */}
                 <div className="flex gap-2 p-4 bg-gray-50 rounded-lg border-2 border-dashed border-gray-200">
                   <Input
+                    placeholder={`Add new ${category.label.toLowerCase()}`}
                     value={newOption.category === category.key ? newOption.value : ''}
                     onChange={(e) => setNewOption(prev => ({ 
                       ...prev, 
@@ -272,7 +562,7 @@ const DeveloperSettings = () => {
                   />
                   <Button
                     onClick={() => handleAddOption(category.key)}
-                    disabled={savingStates[`add_${category.key}`] || !newOption.value.trim()}
+                    disabled={savingStates[`add_${category.key}`] || !newOption.value.trim() || newOption.category !== category.key}
                     style={{ backgroundColor: '#455560' }}
                     className="text-white hover:opacity-90 disabled:opacity-50"
                   >
@@ -291,173 +581,36 @@ const DeveloperSettings = () => {
                 <div className="space-y-2 max-h-64 overflow-y-auto">
                   {options.map((option) => (
                     <div key={option.id} className="flex items-center gap-3 p-3 border rounded-lg bg-white hover:bg-gray-50 transition-colors">
-                      {editingOption?.id === option.id ? (
-                        <>
-                          <Badge 
-                            variant="outline" 
-                            className="font-mono text-xs min-w-[60px] justify-center bg-gray-100 shrink-0"
-                          >
-                            {option.code}
-                          </Badge>
-                          <Input
-                            value={editingOption.value}
-                            onChange={(e) => setEditingOption(prev => 
-                              prev ? { ...prev, value: e.target.value } : null
-                            )}
-                            onKeyPress={(e) => {
-                              if (e.key === 'Enter') {
-                                handleUpdateOption();
-                              } else if (e.key === 'Escape') {
-                                cancelEdit();
-                              }
-                            }}
-                            className="flex-1"
-                            autoFocus
-                          />
-                          <Button
-                            onClick={handleUpdateOption}
-                            disabled={savingStates[`edit_${editingOption.id}`]}
-                            size="sm"
-                            style={{ backgroundColor: '#455560' }}
-                            className="text-white hover:opacity-90"
-                          >
-                            {savingStates[`edit_${editingOption.id}`] ? (
-                              <>Saving...</>
-                            ) : (
-                              <Save className="h-4 w-4" />
-                            )}
-                          </Button>
-                          <Button
-                            onClick={cancelEdit}
-                            size="sm"
-                            variant="outline"
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </>
-                      ) : (
-                        <>
-                          <Badge 
-                            variant="outline" 
-                            className="font-mono text-xs min-w-[60px] justify-center bg-green-50 text-green-700 border-green-300 shrink-0"
-                          >
-                            {option.code}
-                          </Badge>
-                          <span className="flex-1 text-sm font-medium">{option.value}</span>
-                          <div className="flex gap-1">
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                                >
-                                  <Edit2 className="h-4 w-4" />
-                                </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle className="flex items-center gap-2">
-                                    <Edit2 className="h-5 w-5 text-blue-500" />
-                                    Edit Option
-                                  </AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    Update the value for this dropdown option. The unique code <strong>"{option.code}"</strong> will remain unchanged.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <div className="py-4">
-                                  <div className="space-y-2">
-                                    <label className="text-sm font-medium text-gray-700">Option Value</label>
-                                    <Input
-                                      defaultValue={option.value}
-                                      onChange={(e) => setEditingOption({ ...option, value: e.target.value })}
-                                      placeholder="Enter option value"
-                                      className="w-full"
-                                    />
-                                  </div>
-                                  <div className="mt-3 p-2 bg-gray-50 rounded border">
-                                    <span className="text-xs text-gray-600">Code: </span>
-                                    <Badge variant="outline" className="text-xs font-mono">
-                                      {option.code}
-                                    </Badge>
-                                  </div>
-                                </div>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel onClick={() => setEditingOption(null)}>
-                                    Cancel
-                                  </AlertDialogCancel>
-                                  <AlertDialogAction
-                                    onClick={() => {
-                                      if (editingOption) {
-                                        handleUpdateOption();
-                                      }
-                                    }}
-                                    className="bg-blue-600 hover:bg-blue-700 text-white"
-                                    disabled={savingStates[`edit_${option.id}`] || !editingOption?.value?.trim()}
-                                  >
-                                    {savingStates[`edit_${option.id}`] ? (
-                                      <>Saving...</>
-                                    ) : (
-                                      <>
-                                        <Save className="h-4 w-4 mr-2" />
-                                        Save Changes
-                                      </>
-                                    )}
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
-                            <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-                              <AlertDialogTrigger asChild>
-                                <Button
-                                  onClick={() => openDeleteDialog(option.id, option.value)}
-                                  disabled={savingStates[`delete_${option.id}`]}
-                                  size="sm"
-                                  variant="ghost"
-                                  className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                                >
-                                  {savingStates[`delete_${option.id}`] ? (
-                                    <>Deleting...</>
-                                  ) : (
-                                    <Trash2 className="h-4 w-4" />
-                                  )}
-                                </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle className="flex items-center gap-2">
-                                    <AlertCircle className="h-5 w-5 text-red-500" />
-                                    Delete Option
-                                  </AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    Are you sure you want to delete the option <strong>"{itemToDelete?.value}"</strong>?
-                                    <br />
-                                    <br />
-                                    This action cannot be undone. The option will be deactivated and removed from all dropdown menus throughout the system.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                  <AlertDialogAction
-                                    onClick={confirmDelete}
-                                    className="bg-red-600 hover:bg-red-700 text-white"
-                                    disabled={savingStates[`delete_${itemToDelete?.id}`]}
-                                  >
-                                    {savingStates[`delete_${itemToDelete?.id}`] ? (
-                                      <>Deleting...</>
-                                    ) : (
-                                      <>
-                                        <Trash2 className="h-4 w-4 mr-2" />
-                                        Delete Option
-                                      </>
-                                    )}
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
-                          </div>
-                        </>
-                      )}
+                      <Badge 
+                        variant="outline" 
+                        className="font-mono text-xs min-w-[60px] justify-center bg-gray-100 shrink-0"
+                      >
+                        {option.code}
+                      </Badge>
+                      <span className="flex-1 text-sm font-medium">{option.value}</span>
+                      <div className="flex gap-1">
+                        <Button
+                          onClick={() => handleEditOption(option)}
+                          size="sm"
+                          variant="ghost"
+                          className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                        >
+                          <Edit2 className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          onClick={() => openDeleteDialog(option.id, option.value)}
+                          disabled={savingStates[`delete_${option.id}`]}
+                          size="sm"
+                          variant="ghost"
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                        >
+                          {savingStates[`delete_${option.id}`] ? (
+                            <>Deleting...</>
+                          ) : (
+                            <Trash2 className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </div>
                     </div>
                   ))}
                   
@@ -474,6 +627,100 @@ const DeveloperSettings = () => {
           );
         })}
       </div>
+
+      {/* Edit Option Dialog */}
+      {(() => {
+        console.log('Rendering edit dialog check, editingOption:', editingOption);
+        return editingOption ? (
+          <AlertDialog open={!!editingOption} onOpenChange={() => {
+            console.log('Dialog onOpenChange called, closing dialog');
+            setEditingOption(null);
+          }}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle className="flex items-center gap-2">
+                <Edit2 className="h-5 w-5 text-blue-600" />
+                Edit Option
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                Update the value for this dropdown option. The code cannot be changed.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="py-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700">Value</label>
+                <Input
+                  value={editingOption.value}
+                  onChange={(e) => setEditingOption(prev => prev ? { ...prev, value: e.target.value } : null)}
+                  placeholder="Enter option value"
+                  className="w-full"
+                />
+              </div>
+              <div className="mt-3 p-2 bg-gray-50 rounded border">
+                <span className="text-xs text-gray-600">Code: </span>
+                <Badge variant="outline" className="text-xs font-mono">
+                  {editingOption.code}
+                </Badge>
+              </div>
+            </div>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setEditingOption(null)}>
+                Cancel
+              </AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleUpdateOption}
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+                disabled={savingStates[`edit_${editingOption.id}`] || !editingOption.value?.trim()}
+              >
+                {savingStates[`edit_${editingOption.id}`] ? (
+                  <>Saving...</>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4 mr-2" />
+                    Save Changes
+                  </>
+                )}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+        ) : null;
+      })()}
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-red-500" />
+              Delete Option
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete the option <strong>"{itemToDelete?.value}"</strong>?
+              <br />
+              <br />
+              This action cannot be undone. The option will be deactivated and removed from all dropdown menus throughout the system.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-red-600 hover:bg-red-700 text-white"
+              disabled={savingStates[`delete_${itemToDelete?.id}`]}
+            >
+              {savingStates[`delete_${itemToDelete?.id}`] ? (
+                <>Deleting...</>
+              ) : (
+                <>
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete Option
+                </>
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

@@ -4,6 +4,8 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Plus, X } from 'lucide-react';
+import { validateEmail, validatePhoneNumber } from '@/utils/inputValidation';
+import { toast } from 'sonner';
 
 interface ContactInfo {
   name: string;
@@ -25,6 +27,15 @@ const ProjectContactInfo = ({ formData, handleInputChange }: ProjectContactInfoP
   const updateContact = (index: number, field: keyof ContactInfo, value: string) => {
     const updatedContacts = [...contacts];
     updatedContacts[index] = { ...updatedContacts[index], [field]: value };
+    
+    // Validate email and phone in real-time
+    if (field === 'email' && value && !validateEmail(value)) {
+      toast.error('Please enter a valid email address');
+    }
+    if (field === 'phone' && value && !validatePhoneNumber(value)) {
+      toast.error('Please enter a valid phone number');
+    }
+    
     handleInputChange('contacts', updatedContacts);
   };
 
@@ -44,7 +55,9 @@ const ProjectContactInfo = ({ formData, handleInputChange }: ProjectContactInfoP
     <Card>
       <CardHeader>
         <div className="flex justify-between items-center">
-          <CardTitle className="text-lg font-semibold text-gray-800">Sales Contact Details</CardTitle>
+          <CardTitle className="text-lg font-semibold text-gray-800"><h4 className="text-sm font-bold text-gray-800 uppercase tracking-wide mb-5 flex items-center">
+        <span className="w-1.5 h-1.5 bg-blue-600 rounded-full mr-2"></span>
+      Sales Contact Details</h4></CardTitle>
           <Button
             type="button"
             variant="outline"
@@ -76,7 +89,7 @@ const ProjectContactInfo = ({ formData, handleInputChange }: ProjectContactInfoP
             </div>
             
             <div>
-              <Label htmlFor={`contact_name_${index}`}>Contact Name *</Label>
+              <Label htmlFor={`contact_name_${index}`}>Contact Name <span className="text-red-500">*</span></Label>
               <Input
                 id={`contact_name_${index}`}
                 value={contact.name}
@@ -88,7 +101,7 @@ const ProjectContactInfo = ({ formData, handleInputChange }: ProjectContactInfoP
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label htmlFor={`contact_phone_${index}`}>Phone Number *</Label>
+                <Label htmlFor={`contact_phone_${index}`}>Phone Number <span className="text-red-500">*</span></Label>
                 <Input
                   id={`contact_phone_${index}`}
                   type="tel"
@@ -99,7 +112,7 @@ const ProjectContactInfo = ({ formData, handleInputChange }: ProjectContactInfoP
                 />
               </div>
               <div>
-                <Label htmlFor={`contact_email_${index}`}>Email *</Label>
+                <Label htmlFor={`contact_email_${index}`}>Email <span className="text-red-500">*</span></Label>
                 <Input
                   id={`contact_email_${index}`}
                   type="email"

@@ -28,8 +28,8 @@ const DocumentAutofill = ({ onAutoFillData }: DocumentAutofillProps) => {
       }
 
       // Validate file size (max 10MB)
-      if (file.size > 10 * 1024 * 1024) {
-        toast.error('File size must be less than 10MB');
+      if (file.size > 50 * 1024 * 1024) {
+        toast.error('File size must be less than 50MB');
         return;
       }
 
@@ -67,7 +67,7 @@ const DocumentAutofill = ({ onAutoFillData }: DocumentAutofillProps) => {
       formData.append('fileType', file.type);
       
       // Call the n8n webhook for document parsing
-      const response = await fetch('https://ekarbotproject.duckdns.org/webhook/document-parsing', {
+      const response = await fetch('https://ekarbotproject.duckdns.org/webhook-test/document-parsing', {
         method: 'POST',
         body: formData // Send as FormData (binary file)
       });
@@ -153,7 +153,7 @@ const DocumentAutofill = ({ onAutoFillData }: DocumentAutofillProps) => {
                 Upload a project document to automatically fill form fields
               </p>
               <p className="text-sm text-gray-500 mb-4">
-                Supported format: PDF only (Max 10MB)
+                Supported format: PDF only (Max 50MB)
               </p>
               <input
                 type="file"

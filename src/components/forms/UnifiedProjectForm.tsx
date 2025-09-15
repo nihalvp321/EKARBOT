@@ -15,6 +15,8 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useDropdownOptions } from '@/components/hooks/useDropdownOptions';
 import { validateProjectTitle, validatePhoneNumber, validateEmail, validateFileUpload } from '@/utils/inputValidation';
+import UnitAmenitiesSelector from './UnitAmenitiesSelector';
+import DeveloperNameDropdown from './DeveloperNameDropdown';
 
 interface Unit {
   id?: string;
@@ -34,6 +36,7 @@ interface Unit {
   brochure_pdf?: string;
   video_tour_url?: string;
   other_documents?: string[];
+  amenities?: string[]; // Unit-level amenities
   // Project basic info for each unit
   project_title?: string;
   developer_name?: string;
@@ -75,6 +78,7 @@ const UnifiedProjectForm = ({ formData, handleInputChange, handleArrayChange, ed
     brochure_pdf: '',
     video_tour_url: '',
     other_documents: [],
+    amenities: [], // Unit-level amenities
     project_title: '',
     developer_name: '',
     description: '',
@@ -95,6 +99,7 @@ const UnifiedProjectForm = ({ formData, handleInputChange, handleArrayChange, ed
   const { options: projectSubtypeOptions } = useDropdownOptions('project_subtype');
   const { options: listingTypeOptions } = useDropdownOptions('listing_type');
   const { options: projectStatusOptions } = useDropdownOptions('project_status');
+  const { options: amenityOptions } = useDropdownOptions('amenities');
 
   // Filter project subtypes based on selected project type
   const getFilteredSubtypes = () => {
@@ -142,13 +147,35 @@ const UnifiedProjectForm = ({ formData, handleInputChange, handleArrayChange, ed
     }
   }, [formData.project_type, projectSubtypeOptions]);
 
+  // Update form data whenever newUnit changes for specific fields
+  useEffect(() => {
+    if (!editProject) return;
+    
+    // Sync unit data back to form data for editing mode
+    const fieldsToSync = [
+      'project_title', 'description', 'project_type', 'project_subtype', 
+      'listing_type', 'project_status', 'handover_date', 'rera_approval_id',
+      'unit_size_range', 'bedrooms_range', 'bathrooms_range', 'furnishing_status',
+      'ownership_type', 'has_balcony', 'starting_price_aed', 'price_per_sqft',
+      'service_charges', 'payment_plan', 'video_tour_url'
+    ];
+    
+    fieldsToSync.forEach(field => {
+      const unitValue = newUnit[field as keyof Unit];
+      if (unitValue !== undefined && unitValue !== null && unitValue !== '') {
+        handleInputChange(field === 'unit_size_range' ? 'unit_sizes_range' : field, unitValue);
+      }
+    });
+  }, [newUnit.project_title, newUnit.project_type, newUnit.project_subtype, newUnit.listing_type, newUnit.project_status]);
+
+  // Separate useEffect to sync currentUnits with formData.units
   useEffect(() => {
     setCurrentUnits(formData.units || []);
     
-    // When editing and units exist, populate the newUnit form with first unit's data
-    if (formData.units && formData.units.length > 0) {
+    // Populate newUnit form when editing
+    if (editProject && formData.units && formData.units.length > 0) {
       const firstUnit = formData.units[0];
-      console.log('Populating newUnit form with first unit data:', firstUnit);
+      console.log('Populating newUnit form with first unit data for editing:', firstUnit);
       setNewUnit({
         unit_code: firstUnit.unit_code || '',
         unit_size_range: firstUnit.unit_size_range || '',
@@ -166,6 +193,7 @@ const UnifiedProjectForm = ({ formData, handleInputChange, handleArrayChange, ed
         brochure_pdf: firstUnit.brochure_pdf || '',
         video_tour_url: firstUnit.video_tour_url || '',
         other_documents: firstUnit.other_documents || [],
+        amenities: firstUnit.amenities || [],
         // Project basic info from unit or fall back to main form data
         project_title: firstUnit.project_title || formData.project_title || '',
         developer_name: firstUnit.developer_name || formData.developer_name || '',
@@ -177,11 +205,11 @@ const UnifiedProjectForm = ({ formData, handleInputChange, handleArrayChange, ed
         handover_date: firstUnit.handover_date || formData.handover_date || '',
         rera_approval_id: firstUnit.rera_approval_id || formData.rera_approval_id || ''
       });
-    } else if (formData.project_title) {
-      // If no units but we have project data (editing existing project), create a synthetic unit
+    } else if (editProject && formData.project_title && (!formData.units || formData.units.length === 0)) {
+      // If editing existing project without units, create a synthetic unit
       console.log('Creating synthetic unit from project data for editing');
       setNewUnit({
-        unit_code: 'MAIN', // Default unit code for single projects
+        unit_code: 'MAIN',
         unit_size_range: formData.unit_sizes_range || '',
         bedrooms_range: formData.bedrooms_range || '',
         bathrooms_range: formData.bathrooms_range || '',
@@ -197,6 +225,7 @@ const UnifiedProjectForm = ({ formData, handleInputChange, handleArrayChange, ed
         brochure_pdf: formData.brochure_pdf || '',
         video_tour_url: formData.video_tour_url || '',
         other_documents: formData.other_documents || [],
+        amenities: formData.amenities || [],
         // Project basic info
         project_title: formData.project_title || '',
         developer_name: formData.developer_name || '',
@@ -207,9 +236,9 @@ const UnifiedProjectForm = ({ formData, handleInputChange, handleArrayChange, ed
         project_status: formData.project_status || '',
         handover_date: formData.handover_date || '',
         rera_approval_id: formData.rera_approval_id || ''
-      });
+       });
     }
-  }, [formData.units, formData.project_title, formData.project_type, formData.listing_type]);
+  }, [formData.units, editProject, formData.project_title, formData.project_type, formData.project_subtype, formData.listing_type, formData.project_status]);
 
   const generateUnitCode = () => {
     const prefix = 'UNIT';
@@ -217,21 +246,8 @@ const UnifiedProjectForm = ({ formData, handleInputChange, handleArrayChange, ed
     return `${prefix}${timestamp}`;
   };
 
-  const bedroomOptions = [
-    { value: 'Studio', label: 'Studio' },
-    { value: '1 Bedroom', label: '1 Bedroom' },
-    { value: '2 Bedrooms', label: '2 Bedrooms' },
-    { value: '3 Bedrooms', label: '3 Bedrooms' },
-    { value: '4 Bedrooms', label: '4 Bedrooms' },
-    { value: '5+ Bedrooms', label: '5+ Bedrooms' }
-  ];
-
-  const bathroomOptions = [
-    { value: '1 Bathroom', label: '1 Bathroom' },
-    { value: '2 Bathrooms', label: '2 Bathrooms' },
-    { value: '3 Bathrooms', label: '3 Bathrooms' },
-    { value: '4+ Bathrooms', label: '4+ Bathrooms' }
-  ];
+  const { options: bedroomOptions } = useDropdownOptions('bedroom_range');
+  const { options: bathroomOptions } = useDropdownOptions('bathroom_range');
 
   const furnishingOptions = [
     { value: 'Unfurnished', label: 'Unfurnished' },
@@ -270,32 +286,49 @@ const UnifiedProjectForm = ({ formData, handleInputChange, handleArrayChange, ed
   };
 
   const handleNewUnitChange = (field: keyof Unit, value: any) => {
+    console.log(`Updating field ${field} with value:`, value);
+    
     setNewUnit(prev => ({
       ...prev,
       [field]: value
     }));
     
-    // Also update the form data for these fields when editing
-    if (editProject) {
-      const unitFieldMappings = {
-        'unit_size_range': 'unit_sizes_range',
-        'bedrooms_range': 'bedrooms_range',
-        'bathrooms_range': 'bathrooms_range',
-        'furnishing_status': 'furnishing_status',
-        'ownership_type': 'ownership_type',
-        'has_balcony': 'has_balcony',
-        'starting_price_aed': 'starting_price_aed',
-        'price_per_sqft': 'price_per_sqft',
-        'service_charges': 'service_charges',
-        'payment_plan': 'payment_plan',
-        'video_tour_url': 'video_tour_url'
-      };
-      
-      if (unitFieldMappings[field]) {
-        handleInputChange(unitFieldMappings[field], value);
-      } else if (['project_title', 'developer_name', 'description', 'project_type', 'project_subtype', 'listing_type', 'project_status', 'handover_date', 'rera_approval_id'].includes(field)) {
-        handleInputChange(field, value);
-      }
+    // Always update the parent form data to keep everything in sync
+    const unitFieldMappings: Record<string, string> = {
+      'unit_size_range': 'unit_sizes_range',
+      'bedrooms_range': 'bedrooms_range',
+      'bathrooms_range': 'bathrooms_range',
+      'furnishing_status': 'furnishing_status',
+      'ownership_type': 'ownership_type',
+      'has_balcony': 'has_balcony',
+      'starting_price_aed': 'starting_price_aed',
+      'price_per_sqft': 'price_per_sqft',
+      'service_charges': 'service_charges',
+      'payment_plan': 'payment_plan',
+      'video_tour_url': 'video_tour_url',
+      'cover_image': 'cover_image',
+      'gallery_images': 'gallery_images',
+      'brochure_pdf': 'brochure_pdf',
+      'other_documents': 'other_documents'
+    };
+    
+    // Project-level fields that should be synced directly
+    const projectFields = ['project_title', 'developer_name', 'description', 'project_type', 'project_subtype', 'listing_type', 'project_status', 'handover_date', 'rera_approval_id'];
+    
+    if (unitFieldMappings[field]) {
+      console.log(`Syncing unit field ${field} to form field ${unitFieldMappings[field]}`);
+      handleInputChange(unitFieldMappings[field], value);
+    } else if (projectFields.includes(field)) {
+      console.log(`Syncing project field ${field} to form`);
+      handleInputChange(field, value);
+    }
+    
+    // Update the units array if we're editing and this is the first/main unit
+    if (editProject && currentUnits.length > 0) {
+      const updatedUnits = [...currentUnits];
+      updatedUnits[0] = { ...updatedUnits[0], [field]: value };
+      setCurrentUnits(updatedUnits);
+      handleInputChange('units', updatedUnits);
     }
   };
 
@@ -324,6 +357,52 @@ const UnifiedProjectForm = ({ formData, handleInputChange, handleArrayChange, ed
       .getPublicUrl(filePath);
 
     return publicUrlData.publicUrl || null;
+  };
+
+  const handleEditingUnitFileUpload = async (field: string, files: FileList | null) => {
+    if (!files || files.length === 0 || !editingUnit) return;
+    
+    // Validate files
+    for (const file of Array.from(files)) {
+      const validationResult = validateFileUpload(file);
+      if (!validationResult.isValid) {
+        toast.error(`File "${file.name}": ${validationResult.error}`);
+        return;
+      }
+    }
+
+    setUploading(true);
+
+    try {
+      if (field === 'gallery_images' || field === 'other_documents') {
+        const uploadedUrls = [];
+        
+        for (const file of Array.from(files)) {
+          const url = await uploadFileToStorage(file, field);
+          if (url) uploadedUrls.push(url);
+        }
+
+        if (uploadedUrls.length > 0) {
+          const currentFiles = (editingUnit as any)[field] || [];
+          const updatedFiles = [...currentFiles, ...uploadedUrls];
+          setEditingUnit({ ...editingUnit, [field]: updatedFiles } as any);
+        }
+      } else {
+        // Single file upload (cover_image, brochure_pdf)
+        const file = files[0];
+        const url = await uploadFileToStorage(file, field);
+        if (url) {
+          setEditingUnit({ ...editingUnit, [field]: url } as any);
+        }
+      }
+
+      toast.success('File uploaded successfully');
+    } catch (error) {
+      console.error('Error uploading file:', error);
+      toast.error('Failed to upload file. Please try again.');
+    } finally {
+      setUploading(false);
+    }
   };
 
   const handleUnitFileUpload = async (field: string, files: FileList | null, unitIndex?: number) => {
@@ -414,7 +493,7 @@ const UnifiedProjectForm = ({ formData, handleInputChange, handleArrayChange, ed
     const errors = [];
     
     // Remove unit code validation since it's auto-generated
-    // if (!unit.bedrooms_range) errors.push('Bedrooms');
+    // Bedrooms range is optional
     if (!unit.starting_price_aed || unit.starting_price_aed <= 0) errors.push('Starting Price');
     if (unit.unit_size_range && !/^\d+(-\d+)?(\s*(sq ft|sqft))?$/i.test(unit.unit_size_range.trim())) {
       errors.push('Valid Unit Size Range (e.g., "800-1200 sq ft")');
@@ -436,52 +515,43 @@ const UnifiedProjectForm = ({ formData, handleInputChange, handleArrayChange, ed
       id: Date.now().toString()
     };
 
-    // Check if we're editing existing units (update first unit) or adding new
-    if (currentUnits.length > 0) {
-      // Update first existing unit with new data
-      const updatedUnits = [...currentUnits];
-      updatedUnits[0] = unitToAdd;
-      setCurrentUnits(updatedUnits);
-      handleInputChange('units', updatedUnits);
-      toast.success('Unit updated successfully');
-    } else {
-      // Add new unit
-      const updatedUnits = [...currentUnits, unitToAdd];
-      setCurrentUnits(updatedUnits);
-      handleInputChange('units', updatedUnits);
-      toast.success('Unit added successfully');
-    }
+    // Always add new unit to the list
+    const updatedUnits = [...currentUnits, unitToAdd];
+    setCurrentUnits(updatedUnits);
+    handleInputChange('units', updatedUnits);
     
-    // Reset form only when adding new (not editing)
-    if (currentUnits.length === 0) {
-      setNewUnit({
-        unit_code: '',
-        unit_size_range: '',
-        bedrooms_range: '',
-        bathrooms_range: '',
-        furnishing_status: '',
-        ownership_type: '',
-        has_balcony: false,
-        starting_price_aed: 0,
-        price_per_sqft: 0,
-        service_charges: 0,
-        payment_plan: '',
-        cover_image: '',
-        gallery_images: [],
-        brochure_pdf: '',
-        video_tour_url: '',
-        other_documents: [],
-        project_title: '',
-        developer_name: '',
-        description: '',
-        project_type: '',
-        project_subtype: '',
-        listing_type: '',
-        project_status: '',
-        handover_date: '',
-        rera_approval_id: ''
-      });
-    }
+    // Always reset the form completely after adding
+    const emptyUnit = {
+      unit_code: '',
+      unit_size_range: '',
+      bedrooms_range: '',
+      bathrooms_range: '',
+      furnishing_status: '',
+      ownership_type: '',
+      has_balcony: false,
+      starting_price_aed: 0,
+      price_per_sqft: 0,
+      service_charges: 0,
+      payment_plan: '',
+      cover_image: '',
+      gallery_images: [],
+      brochure_pdf: '',
+      video_tour_url: '',
+      other_documents: [],
+      project_title: '',
+      developer_name: '',
+      description: '',
+      project_type: '',
+      project_subtype: '',
+      listing_type: '',
+      project_status: '',
+      handover_date: '',
+      rera_approval_id: ''
+    };
+    
+    setNewUnit(emptyUnit);
+    
+    toast.success('Unit added successfully');
   };
 
   const handleRemoveUnit = (index: number) => {
@@ -527,87 +597,62 @@ const UnifiedProjectForm = ({ formData, handleInputChange, handleArrayChange, ed
     <div className="space-y-6">
 
       {/* Add New Unit */}
-      <Card className="shadow-lg rounded-2xl border border-gray-200">
-  <CardHeader className="border-b pb-4">
-    <CardTitle className="text-lg font-semibold flex items-center justify-between">
-      <div className="flex items-center">
-        <Plus className="h-5 w-5 mr-2 text-blue-600" />
-        {currentUnits.length > 0 ? 'Edit Unit Details' : 'Add New Unit'}
-      </div>
-      {currentUnits.length > 0 && (
-        <span className="text-xs font-medium text-blue-700 bg-blue-100 px-3 py-1 rounded-full shadow-sm">
-          Editing {currentUnits.length} unit{currentUnits.length > 1 ? 's' : ''}
-        </span>
-      )}
-    </CardTitle>
-  </CardHeader>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-md flex items-center">
+            <Plus className="h-4 w-4 mr-2" />
+            Add New Unit
+            {currentUnits.length > 0 && (
+              <span className="ml-2 text-sm text-green-600 bg-green-50 px-2 py-1 rounded">
+                {currentUnits.length} unit{currentUnits.length > 1 ? 's' : ''} added
+              </span>
+            )}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Project Basic Info Section - Each unit can have different project info */}
+          <div>
+            <h4 className="text-sm font-semibold text-gray-700 mb-4">Project Basic Information</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+              <div>
+                <Label htmlFor="unit_project_title">Project Name *</Label>
+                <Input
+                  id="unit_project_title"
+                  value={newUnit.project_title || ''}
+                  onChange={(e) => handleNewUnitChange('project_title', e.target.value)}
+                  placeholder="Marina Vista"
+                  required
+                />
+              </div>
+              <div>
+                <DeveloperNameDropdown
+                  value={formData.developer_name || ''}
+                  onValueChange={(value) => handleInputChange('developer_name', value)}
+                />
+              </div>
+            </div>
 
-  <CardContent className="space-y-8 pt-6">
-    {/* Project Basic Info Section */}
-    <div>
-      <h4 className="text-sm font-bold text-gray-800 uppercase tracking-wide mb-5 flex items-center">
-        <span className="w-1.5 h-1.5 bg-blue-600 rounded-full mr-2"></span>
-        Project Basic Information
-      </h4>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Project Name */}
-        <div className="space-y-2">
-          <Label
-            htmlFor="unit_project_title"
-            className="text-sm font-medium text-gray-700"
-          >
-            Project Name <span className="text-red-500">*</span>
-          </Label>
-          <Input
-            id="unit_project_title"
-            value={newUnit.project_title || ''}
-            onChange={(e) =>
-              handleNewUnitChange('project_title', e.target.value)
-            }
-            placeholder="e.g. Marina Vista"
-            required
-            className="rounded-lg border-gray-300 focus:border-blue-500 focus:ring focus:ring-blue-200"
-          />
-        </div>
-
-        {/* Developer Name */}
-        <div className="space-y-2">
-          <Label
-            htmlFor="unit_developer_name"
-            className="text-sm font-medium text-gray-700"
-          >
-            Developer Name <span className="text-red-500">*</span>
-          </Label>
-          <Input
-            id="unit_developer_name"
-            value={formData.developer_name || ''}
-            readOnly
-            className="rounded-lg bg-gray-100 cursor-not-allowed border-gray-300"
-            placeholder="Developer name"
-            required
-          />
-        </div>
-      </div>
-            {/* Project Description */}
-<div className="mb-8">
-  <Label htmlFor="unit_description" className="font-medium text-gray-700">
-    Project Description
-  </Label>
-  <Textarea
-    id="unit_description"
-    value={newUnit.description || ''}
-    onChange={(e) => handleNewUnitChange('description', e.target.value)}
-    placeholder="A luxury development with sea views..."
-    rows={4}
-    className="mt-2 rounded-lg border-gray-300 focus:ring focus:ring-blue-200 focus:border-blue-500"
-  />
-</div>
+            <div className="mb-6">
+              <Label htmlFor="unit_description">Project Description</Label>
+              <Textarea
+                id="unit_description"
+                value={newUnit.description || ''}
+                onChange={(e) => handleNewUnitChange('description', e.target.value)}
+                placeholder="A luxury development with sea views..."
+                rows={3}
+              />
+            </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
               <div>
-                <Label htmlFor="unit_project_type">Project Type <span className="text-red-500">*</span></Label>
-                <Select value={newUnit.project_type || ''} onValueChange={(value) => handleNewUnitChange('project_type', value)}>
+                <Label htmlFor="unit_project_type">Project Type *</Label>
+                <Select 
+                  value={newUnit.project_type || ''} 
+                  onValueChange={(value) => {
+                    console.log('Project type changed to:', value);
+                    handleNewUnitChange('project_type', value);
+                  }}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Select type" />
                   </SelectTrigger>
@@ -625,10 +670,13 @@ const UnifiedProjectForm = ({ formData, handleInputChange, handleArrayChange, ed
                 </Select>
               </div>
               <div>
-                <Label htmlFor="unit_project_subtype">Project Subtype <span className="text-red-500">*</span></Label>
+                <Label htmlFor="unit_project_subtype">Project Subtype *</Label>
                 <Select 
                   value={newUnit.project_subtype || ''} 
-                  onValueChange={(value) => handleNewUnitChange('project_subtype', value)}
+                  onValueChange={(value) => {
+                    console.log('Project subtype changed to:', value);
+                    handleNewUnitChange('project_subtype', value);
+                  }}
                   disabled={!newUnit.project_type}
                 >
                   <SelectTrigger>
@@ -648,14 +696,24 @@ const UnifiedProjectForm = ({ formData, handleInputChange, handleArrayChange, ed
                 </Select>
               </div>
               <div>
-                <Label htmlFor="unit_listing_type">Listing Type <span className="text-red-500">*</span></Label>
-                <Select value={newUnit.listing_type || ''} onValueChange={(value) => handleNewUnitChange('listing_type', value)}>
+                <Label htmlFor="unit_listing_type">Listing Type *</Label>
+                <Select 
+                  value={newUnit.listing_type || ''} 
+                  onValueChange={(value) => {
+                    console.log('Listing type changed to:', value);
+                    handleNewUnitChange('listing_type', value);
+                  }}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Select listing type" />
                   </SelectTrigger>
-                  <SelectContent className="bg-white border shadow-lg z-50">
+                  <SelectContent className="bg-white border-2 border-gray-300 shadow-xl z-[100] max-h-60 overflow-auto">
                     {listingTypeOptions.map((option) => (
-                      <SelectItem key={option.id} value={option.value}>
+                      <SelectItem 
+                        key={option.id} 
+                        value={option.value}
+                        className="bg-white hover:bg-blue-50 cursor-pointer px-4 py-2"
+                      >
                         {option.value}
                       </SelectItem>
                     ))}
@@ -663,14 +721,24 @@ const UnifiedProjectForm = ({ formData, handleInputChange, handleArrayChange, ed
                 </Select>
               </div>
               <div>
-                <Label htmlFor="unit_project_status">Completion Status <span className="text-red-500">*</span></Label>
-                <Select value={newUnit.project_status || ''} onValueChange={(value) => handleNewUnitChange('project_status', value)}>
+                <Label htmlFor="unit_project_status">Completion Status *</Label>
+                <Select 
+                  value={newUnit.project_status || ''} 
+                  onValueChange={(value) => {
+                    console.log('Project status changed to:', value);
+                    handleNewUnitChange('project_status', value);
+                  }}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Select status" />
                   </SelectTrigger>
-                  <SelectContent className="bg-white border shadow-lg z-50">
+                  <SelectContent className="bg-white border-2 border-gray-300 shadow-xl z-[100] max-h-60 overflow-auto">
                     {projectStatusOptions.map((option) => (
-                      <SelectItem key={option.id} value={option.value}>
+                      <SelectItem 
+                        key={option.id} 
+                        value={option.value}
+                        className="bg-white hover:bg-blue-50 cursor-pointer px-4 py-2"
+                      >
                         {option.value}
                       </SelectItem>
                     ))}
@@ -719,11 +787,10 @@ const UnifiedProjectForm = ({ formData, handleInputChange, handleArrayChange, ed
             </div>
           </div>
 
+
           {/* Unit Details Section */}
           <div>
-            <h4 className="text-sm font-bold text-gray-800 uppercase tracking-wide mb-5 flex items-center">
-        <span className="w-1.5 h-1.5 bg-blue-600 rounded-full mr-2"></span>
-      Unit Details</h4>
+            <h4 className="text-sm font-semibold text-gray-700 mb-4">Unit Details</h4>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
 
               <div className="space-y-2">
@@ -738,14 +805,30 @@ const UnifiedProjectForm = ({ formData, handleInputChange, handleArrayChange, ed
 
               <div className="space-y-2">
                 <Label htmlFor="bedrooms_range">Bedrooms</Label>
-                <Select value={newUnit.bedrooms_range} onValueChange={(value) => handleNewUnitChange('bedrooms_range', value)}>
+                <Select 
+                  value={newUnit.bedrooms_range} 
+                  onValueChange={(value) => {
+                    console.log('Bedrooms changed to:', value);
+                    handleNewUnitChange('bedrooms_range', value);
+                  }}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Select bedrooms" />
                   </SelectTrigger>
-                  <SelectContent className="bg-white z-50">
+                  <SelectContent className="bg-white border-2 border-gray-300 shadow-xl z-[100] max-h-60 overflow-auto">
+                    {/* Ensure existing value is selectable even if not in options */}
+                    {newUnit.bedrooms_range && !bedroomOptions.some(o => o.value === newUnit.bedrooms_range) && (
+                      <SelectItem key="current-bedroom" value={newUnit.bedrooms_range} className="bg-white px-4 py-2">
+                        {newUnit.bedrooms_range}
+                      </SelectItem>
+                    )}
                     {bedroomOptions.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
+                      <SelectItem 
+                        key={option.value} 
+                        value={option.value}
+                        className="bg-white hover:bg-blue-50 cursor-pointer px-4 py-2"
+                      >
+                        {option.value}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -754,14 +837,29 @@ const UnifiedProjectForm = ({ formData, handleInputChange, handleArrayChange, ed
 
               <div className="space-y-2">
                 <Label htmlFor="bathrooms_range">Bathrooms</Label>
-                <Select value={newUnit.bathrooms_range} onValueChange={(value) => handleNewUnitChange('bathrooms_range', value)}>
+                <Select 
+                  value={newUnit.bathrooms_range} 
+                  onValueChange={(value) => {
+                    console.log('Bathrooms changed to:', value);
+                    handleNewUnitChange('bathrooms_range', value);
+                  }}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Select bathrooms" />
                   </SelectTrigger>
-                  <SelectContent className="bg-white z-50">
+                  <SelectContent className="bg-white border-2 border-gray-300 shadow-xl z-[100] max-h-60 overflow-auto">
+                    {newUnit.bathrooms_range && !bathroomOptions.some(o => o.value === newUnit.bathrooms_range) && (
+                      <SelectItem key="current-bathroom" value={newUnit.bathrooms_range} className="bg-white px-4 py-2">
+                        {newUnit.bathrooms_range}
+                      </SelectItem>
+                    )}
                     {bathroomOptions.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
+                      <SelectItem 
+                        key={option.value} 
+                        value={option.value}
+                        className="bg-white hover:bg-blue-50 cursor-pointer px-4 py-2"
+                      >
+                        {option.value}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -770,13 +868,23 @@ const UnifiedProjectForm = ({ formData, handleInputChange, handleArrayChange, ed
 
               <div className="space-y-2">
                 <Label htmlFor="furnishing_status">Furnishing Status</Label>
-                <Select value={newUnit.furnishing_status} onValueChange={(value) => handleNewUnitChange('furnishing_status', value)}>
+                <Select 
+                  value={newUnit.furnishing_status} 
+                  onValueChange={(value) => {
+                    console.log('Furnishing status changed to:', value);
+                    handleNewUnitChange('furnishing_status', value);
+                  }}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Select furnishing" />
                   </SelectTrigger>
-                  <SelectContent className="bg-white z-50">
+                  <SelectContent className="bg-white border-2 border-gray-300 shadow-xl z-[100] max-h-60 overflow-auto">
                     {furnishingOptions.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
+                      <SelectItem 
+                        key={option.value} 
+                        value={option.value}
+                        className="bg-white hover:bg-blue-50 cursor-pointer px-4 py-2"
+                      >
                         {option.label}
                       </SelectItem>
                     ))}
@@ -786,13 +894,23 @@ const UnifiedProjectForm = ({ formData, handleInputChange, handleArrayChange, ed
 
               <div className="space-y-2">
                 <Label htmlFor="ownership_type">Ownership Type</Label>
-                <Select value={newUnit.ownership_type} onValueChange={(value) => handleNewUnitChange('ownership_type', value)}>
+                <Select 
+                  value={newUnit.ownership_type} 
+                  onValueChange={(value) => {
+                    console.log('Ownership type changed to:', value);
+                    handleNewUnitChange('ownership_type', value);
+                  }}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Select ownership" />
                   </SelectTrigger>
-                  <SelectContent className="bg-white z-50">
+                  <SelectContent className="bg-white border-2 border-gray-300 shadow-xl z-[100] max-h-60 overflow-auto">
                     {ownershipOptions.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
+                      <SelectItem 
+                        key={option.value} 
+                        value={option.value}
+                        className="bg-white hover:bg-blue-50 cursor-pointer px-4 py-2"
+                      >
                         {option.label}
                       </SelectItem>
                     ))}
@@ -815,12 +933,10 @@ const UnifiedProjectForm = ({ formData, handleInputChange, handleArrayChange, ed
 
           {/* Pricing Details Section */}
           <div>
-            <h4 className="text-sm font-bold text-gray-800 uppercase tracking-wide mb-5 flex items-center">
-        <span className="w-1.5 h-1.5 bg-blue-600 rounded-full mr-2"></span>
-      Pricing Details</h4>
+            <h4 className="text-sm font-semibold text-gray-700 mb-4">Pricing Details</h4>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="starting_price_aed">Starting Price (AED) <span className="text-red-500">*</span></Label>
+                <Label htmlFor="starting_price_aed">Starting Price (AED) *</Label>
                 <Input
                   id="starting_price_aed"
                   type="number"
@@ -869,10 +985,8 @@ const UnifiedProjectForm = ({ formData, handleInputChange, handleArrayChange, ed
 
           {/* Media Upload Section */}
           <div>
-            <h4 className="text-sm font-bold text-gray-800 uppercase tracking-wide mb-5 flex items-center">
-        <span className="w-1.5 h-1.5 bg-blue-600 rounded-full mr-2"></span>
-      Media Uploads</h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <h4 className="text-sm font-semibold text-gray-700 mb-4">Media Uploads</h4>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
               {/* Cover Image */}
               <div className="space-y-2">
                 <Label>Cover Image</Label>
@@ -1038,9 +1152,9 @@ const UnifiedProjectForm = ({ formData, handleInputChange, handleArrayChange, ed
 
           {!editProject && (
             <div className="flex justify-end">
-              <Button onClick={handleAddUnit} className="bg-blue-600 hover:bg-blue-700" disabled={uploading}>
+               <Button onClick={handleAddUnit} className="bg-blue-600 hover:bg-blue-700" disabled={uploading}>
                 <Plus className="h-4 w-4 mr-2" />
-                {uploading ? 'Uploading...' : (currentUnits.length > 0 ? 'Update Unit' : 'Add Unit')}
+                {uploading ? 'Uploading...' : 'Add Unit'}
               </Button>
             </div>
           )}
@@ -1063,140 +1177,515 @@ const UnifiedProjectForm = ({ formData, handleInputChange, handleArrayChange, ed
                {currentUnits.map((unit, index) => (
                  <div key={unit.id || index} className="border rounded-lg p-4 bg-gray-50">
                    {editingUnit && (editingUnit as any).originalIndex === index ? (
-                     // Edit mode - Show ALL unit fields
-                     <div className="space-y-4">
-                       <h4 className="font-semibold text-gray-800 mb-4">Edit Unit Details</h4>
-                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                         <div>
-                           <Label>Unit Code</Label>
-                           <Input
-                             value={editingUnit.unit_code}
-                             onChange={(e) => setEditingUnit({ ...editingUnit, unit_code: e.target.value })}
-                             placeholder="Unit code"
-                           />
-                         </div>
-                         <div>
-                           <Label>Unit Size Range</Label>
-                           <Input
-                             value={editingUnit.unit_size_range}
-                             onChange={(e) => setEditingUnit({ ...editingUnit, unit_size_range: e.target.value })}
-                             placeholder="e.g., 800-1200 sqft"
-                           />
-                         </div>
-                         <div>
-                           <Label>Bedrooms Range</Label>
-                           <Input
-                             value={editingUnit.bedrooms_range}
-                             onChange={(e) => setEditingUnit({ ...editingUnit, bedrooms_range: e.target.value })}
-                             placeholder="e.g., 2 Bedrooms"
-                           />
-                         </div>
-                         <div>
-                           <Label>Bathrooms Range</Label>
-                           <Input
-                             value={editingUnit.bathrooms_range}
-                             onChange={(e) => setEditingUnit({ ...editingUnit, bathrooms_range: e.target.value })}
-                             placeholder="e.g., 2 Bathrooms"
-                           />
-                         </div>
-                         <div>
-                           <Label>Furnishing Status</Label>
-                           <Select
-                             value={editingUnit.furnishing_status}
-                             onValueChange={(value) => setEditingUnit({ ...editingUnit, furnishing_status: value })}
-                           >
-                             <SelectTrigger>
-                               <SelectValue placeholder="Select furnishing" />
-                             </SelectTrigger>
-                             <SelectContent>
-                               <SelectItem value="Unfurnished">Unfurnished</SelectItem>
-                               <SelectItem value="Semi-Furnished">Semi-Furnished</SelectItem>
-                               <SelectItem value="Fully Furnished">Fully Furnished</SelectItem>
-                             </SelectContent>
-                           </Select>
-                         </div>
-                         <div>
-                           <Label>Ownership Type</Label>
-                           <Select
-                             value={editingUnit.ownership_type}
-                             onValueChange={(value) => setEditingUnit({ ...editingUnit, ownership_type: value })}
-                           >
-                             <SelectTrigger>
-                               <SelectValue placeholder="Select ownership" />
-                             </SelectTrigger>
-                             <SelectContent>
-                               <SelectItem value="Freehold">Freehold</SelectItem>
-                               <SelectItem value="Leasehold">Leasehold</SelectItem>
-                             </SelectContent>
-                           </Select>
-                         </div>
-                         <div>
-                           <Label>Starting Price (AED)</Label>
-                           <Input
-                             type="number"
-                             value={editingUnit.starting_price_aed}
-                             onChange={(e) => setEditingUnit({ ...editingUnit, starting_price_aed: parseInt(e.target.value) || 0 })}
-                             placeholder="Starting price"
-                           />
-                         </div>
-                         <div>
-                           <Label>Price per Sqft (AED)</Label>
-                           <Input
-                             type="number"
-                             value={editingUnit.price_per_sqft}
-                             onChange={(e) => setEditingUnit({ ...editingUnit, price_per_sqft: parseInt(e.target.value) || 0 })}
-                             placeholder="Price per sqft"
-                           />
-                         </div>
-                         <div>
-                           <Label>Service Charges (AED)</Label>
-                           <Input
-                             type="number"
-                             value={editingUnit.service_charges}
-                             onChange={(e) => setEditingUnit({ ...editingUnit, service_charges: parseInt(e.target.value) || 0 })}
-                             placeholder="Service charges"
-                           />
-                         </div>
-                         <div>
-                           <Label>Payment Plan</Label>
-                           <Input
-                             value={editingUnit.payment_plan}
-                             onChange={(e) => setEditingUnit({ ...editingUnit, payment_plan: e.target.value })}
-                             placeholder="e.g., 10% Down Payment"
-                           />
-                         </div>
-                         <div>
-                           <Label>Video Tour URL</Label>
-                           <Input
-                             value={editingUnit.video_tour_url || ''}
-                             onChange={(e) => setEditingUnit({ ...editingUnit, video_tour_url: e.target.value })}
-                             placeholder="https://..."
-                           />
-                         </div>
-                         <div className="flex items-center space-x-2">
-                           <Checkbox
-                             checked={editingUnit.has_balcony}
-                             onCheckedChange={(checked) => setEditingUnit({ ...editingUnit, has_balcony: !!checked })}
-                           />
-                           <Label>Has Balcony</Label>
-                         </div>
-                       </div>
-                       <div className="flex items-center justify-end space-x-2 pt-4 border-t">
-                         <Button 
-                           onClick={handleCancelEdit}
-                           variant="outline"
-                         >
-                           Cancel
-                         </Button>
-                         <Button 
-                           onClick={handleUpdateUnit}
-                           style={{ backgroundColor: '#455560' }}
-                           className="text-white hover:opacity-90"
-                         >
-                           Save Changes
-                         </Button>
-                       </div>
-                     </div>
+                      // Edit mode - Show ALL unit fields including project info and media
+                      <div className="space-y-6">
+                        <h4 className="font-semibold text-gray-800 mb-4">Edit Unit Details</h4>
+                        
+                        {/* Project Basic Information Section */}
+                        <div>
+                          <h5 className="text-sm font-semibold text-gray-700 mb-4">Project Basic Information</h5>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                            <div>
+                              <Label>Project Name *</Label>
+                              <Input
+                                value={editingUnit.project_title || ''}
+                                onChange={(e) => setEditingUnit({ ...editingUnit, project_title: e.target.value })}
+                                placeholder="Marina Vista"
+                              />
+                            </div>
+                            <div>
+                              <DeveloperNameDropdown
+                                value={formData.developer_name || ''}
+                                onValueChange={(value) => handleInputChange('developer_name', value)}
+                              />
+                            </div>
+                          </div>
+
+                          <div className="mb-4">
+                            <Label>Project Description</Label>
+                            <Textarea
+                              value={editingUnit.description || ''}
+                              onChange={(e) => setEditingUnit({ ...editingUnit, description: e.target.value })}
+                              placeholder="A luxury development with sea views..."
+                              rows={3}
+                            />
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                            <div>
+                              <Label>Project Type *</Label>
+                              <Select 
+                                value={editingUnit.project_type || ''} 
+                                onValueChange={(value) => setEditingUnit({ ...editingUnit, project_type: value })}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select type" />
+                                </SelectTrigger>
+                                <SelectContent className="bg-white border-2 border-gray-300 shadow-xl z-[100] max-h-60 overflow-auto">
+                                  {projectTypeOptions.map((option) => (
+                                    <SelectItem 
+                                      key={option.id} 
+                                      value={option.value}
+                                      className="bg-white hover:bg-blue-50 cursor-pointer px-4 py-2"
+                                    >
+                                      {option.value}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            <div>
+                              <Label>Project Sub-Type</Label>
+                              <Select 
+                                value={editingUnit.project_subtype || ''} 
+                                onValueChange={(value) => setEditingUnit({ ...editingUnit, project_subtype: value })}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select sub-type" />
+                                </SelectTrigger>
+                                <SelectContent className="bg-white border-2 border-gray-300 shadow-xl z-[100] max-h-60 overflow-auto">
+                                  {getFilteredSubtypes().map((option) => (
+                                    <SelectItem 
+                                      key={option.id} 
+                                      value={option.value}
+                                      className="bg-white hover:bg-blue-50 cursor-pointer px-4 py-2"
+                                    >
+                                      {option.value}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            <div>
+                              <Label>Listing Type *</Label>
+                              <Select 
+                                value={editingUnit.listing_type || ''} 
+                                onValueChange={(value) => setEditingUnit({ ...editingUnit, listing_type: value })}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select listing type" />
+                                </SelectTrigger>
+                                <SelectContent className="bg-white border-2 border-gray-300 shadow-xl z-[100] max-h-60 overflow-auto">
+                                  {listingTypeOptions.map((option) => (
+                                    <SelectItem 
+                                      key={option.id} 
+                                      value={option.value}
+                                      className="bg-white hover:bg-blue-50 cursor-pointer px-4 py-2"
+                                    >
+                                      {option.value}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            <div>
+                              <Label>Completion Status *</Label>
+                              <Select 
+                                value={editingUnit.project_status || ''} 
+                                onValueChange={(value) => setEditingUnit({ ...editingUnit, project_status: value })}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select status" />
+                                </SelectTrigger>
+                                <SelectContent className="bg-white border-2 border-gray-300 shadow-xl z-[100] max-h-60 overflow-auto">
+                                  {projectStatusOptions.map((option) => (
+                                    <SelectItem 
+                                      key={option.id} 
+                                      value={option.value}
+                                      className="bg-white hover:bg-blue-50 cursor-pointer px-4 py-2"
+                                    >
+                                      {option.value}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            <div>
+                              <Label>Handover Date</Label>
+                              <Popover open={isDatePickerOpen} onOpenChange={setIsDatePickerOpen}>
+                                <PopoverTrigger asChild>
+                                  <Button
+                                    variant="outline"
+                                    className={cn(
+                                      "w-full justify-start text-left font-normal",
+                                      !editingUnit.handover_date && "text-muted-foreground"
+                                    )}
+                                  >
+                                    <CalendarIcon className="mr-2 h-4 w-4" />
+                                    {editingUnit.handover_date ? (
+                                      format(new Date(editingUnit.handover_date), "PPP")
+                                    ) : (
+                                      <span>Pick a date</span>
+                                    )}
+                                  </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0" align="start">
+                                  <Calendar
+                                    mode="single"
+                                    selected={editingUnit.handover_date ? new Date(editingUnit.handover_date) : undefined}
+                                    onSelect={(date) => {
+                                      setEditingUnit({ 
+                                        ...editingUnit, 
+                                        handover_date: date ? format(date, 'yyyy-MM-dd') : '' 
+                                      });
+                                      setIsDatePickerOpen(false);
+                                    }}
+                                    disabled={(date) => date < today}
+                                    initialFocus
+                                  />
+                                </PopoverContent>
+                              </Popover>
+                            </div>
+
+                            <div>
+                              <Label>RERA Approval ID</Label>
+                              <Input
+                                value={editingUnit.rera_approval_id || ''}
+                                onChange={(e) => setEditingUnit({ ...editingUnit, rera_approval_id: e.target.value })}
+                                placeholder="RERA123456"
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Unit Details Section */}
+                        <div>
+                          <h5 className="text-sm font-semibold text-gray-700 mb-4">Unit Details</h5>
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            <div>
+                              <Label>Unit Code</Label>
+                              <Input
+                                value={editingUnit.unit_code}
+                                onChange={(e) => setEditingUnit({ ...editingUnit, unit_code: e.target.value })}
+                                placeholder="Unit code"
+                              />
+                            </div>
+                            <div>
+                              <Label>Unit Size Range</Label>
+                              <Input
+                                value={editingUnit.unit_size_range}
+                                onChange={(e) => setEditingUnit({ ...editingUnit, unit_size_range: e.target.value })}
+                                placeholder="e.g., 800-1200 sqft"
+                              />
+                            </div>
+                            <div>
+                              <Label>Bedrooms Range</Label>
+                              <Select
+                                value={editingUnit.bedrooms_range}
+                                onValueChange={(value) => setEditingUnit({ ...editingUnit, bedrooms_range: value })}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select bedrooms" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {bedroomOptions.map((option) => (
+                                    <SelectItem key={option.value} value={option.value}>
+                                      {option.value}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div>
+                              <Label>Bathrooms Range</Label>
+                              <Select
+                                value={editingUnit.bathrooms_range}
+                                onValueChange={(value) => setEditingUnit({ ...editingUnit, bathrooms_range: value })}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select bathrooms" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {bathroomOptions.map((option) => (
+                                    <SelectItem key={option.value} value={option.value}>
+                                      {option.value}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div>
+                              <Label>Furnishing Status</Label>
+                              <Select
+                                value={editingUnit.furnishing_status}
+                                onValueChange={(value) => setEditingUnit({ ...editingUnit, furnishing_status: value })}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select furnishing" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {furnishingOptions.map((option) => (
+                                    <SelectItem key={option.value} value={option.value}>
+                                      {option.value}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div>
+                              <Label>Ownership Type</Label>
+                              <Select
+                                value={editingUnit.ownership_type}
+                                onValueChange={(value) => setEditingUnit({ ...editingUnit, ownership_type: value })}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select ownership" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {ownershipOptions.map((option) => (
+                                    <SelectItem key={option.value} value={option.value}>
+                                      {option.value}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <Checkbox
+                                checked={editingUnit.has_balcony}
+                                onCheckedChange={(checked) => setEditingUnit({ ...editingUnit, has_balcony: !!checked })}
+                              />
+                              <Label>Has Balcony</Label>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Pricing Details Section */}
+                        <div>
+                          <h5 className="text-sm font-semibold text-gray-700 mb-4">Pricing Details</h5>
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            <div>
+                              <Label>Starting Price (AED)</Label>
+                              <Input
+                                type="number"
+                                value={editingUnit.starting_price_aed}
+                                onChange={(e) => setEditingUnit({ ...editingUnit, starting_price_aed: parseInt(e.target.value) || 0 })}
+                                placeholder="Starting price"
+                              />
+                            </div>
+                            <div>
+                              <Label>Price per Sqft (AED)</Label>
+                              <Input
+                                type="number"
+                                value={editingUnit.price_per_sqft}
+                                onChange={(e) => setEditingUnit({ ...editingUnit, price_per_sqft: parseInt(e.target.value) || 0 })}
+                                placeholder="Price per sqft"
+                              />
+                            </div>
+                            <div>
+                              <Label>Service Charges (AED per sq ft)</Label>
+                              <Input
+                                type="number"
+                                value={editingUnit.service_charges}
+                                onChange={(e) => setEditingUnit({ ...editingUnit, service_charges: parseInt(e.target.value) || 0 })}
+                                placeholder="Service charges"
+                              />
+                            </div>
+                            <div className="col-span-1 md:col-span-2 lg:col-span-3">
+                              <Label>Payment Plan</Label>
+                              <Textarea
+                                value={editingUnit.payment_plan}
+                                onChange={(e) => setEditingUnit({ ...editingUnit, payment_plan: e.target.value })}
+                                placeholder="10% on booking, 50% during construction, 40% on handover..."
+                                rows={2}
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+
+                        {/* Media Uploads Section */}
+                        <div>
+                          <h5 className="text-sm font-semibold text-gray-700 mb-4">Media Uploads</h5>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {/* Cover Image */}
+                            <div className="space-y-2">
+                              <Label>Cover Image</Label>
+                              <div className="border-2 border-dashed border-gray-300 rounded-lg p-4">
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  onChange={(e) => handleEditingUnitFileUpload('cover_image', e.target.files)}
+                                  className="hidden"
+                                  id={`edit-cover-image-${(editingUnit as any).originalIndex}`}
+                                  disabled={uploading}
+                                />
+                                <label
+                                  htmlFor={`edit-cover-image-${(editingUnit as any).originalIndex}`}
+                                  className="cursor-pointer flex flex-col items-center justify-center space-y-2"
+                                >
+                                  <Image className="h-8 w-8 text-gray-400" />
+                                  <span className="text-sm text-gray-500">Click to upload cover image</span>
+                                </label>
+                                {editingUnit.cover_image && (
+                                  <div className="mt-2 relative">
+                                    <img src={editingUnit.cover_image} alt="Cover" className="w-full h-32 object-cover rounded" />
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => setEditingUnit({ ...editingUnit, cover_image: '' })}
+                                      className="absolute top-1 right-1 text-red-600"
+                                    >
+                                      <X className="h-3 w-3" />
+                                    </Button>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Gallery Images */}
+                            <div className="space-y-2">
+                              <Label>Gallery Images</Label>
+                              <div className="border-2 border-dashed border-gray-300 rounded-lg p-4">
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  multiple
+                                  onChange={(e) => handleEditingUnitFileUpload('gallery_images', e.target.files)}
+                                  className="hidden"
+                                  id={`edit-gallery-images-${(editingUnit as any).originalIndex}`}
+                                  disabled={uploading}
+                                />
+                                <label
+                                  htmlFor={`edit-gallery-images-${(editingUnit as any).originalIndex}`}
+                                  className="cursor-pointer flex flex-col items-center justify-center space-y-2"
+                                >
+                                  <Image className="h-8 w-8 text-gray-400" />
+                                  <span className="text-sm text-gray-500">Click to upload gallery images</span>
+                                </label>
+                                {editingUnit.gallery_images && editingUnit.gallery_images.length > 0 && (
+                                  <div className="mt-2 grid grid-cols-2 gap-2">
+                                    {editingUnit.gallery_images.map((url, imgIndex) => (
+                                      <div key={imgIndex} className="relative">
+                                        <img src={url} alt={`Gallery ${imgIndex + 1}`} className="w-full h-20 object-cover rounded" />
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={() => {
+                                            const updatedGallery = editingUnit.gallery_images?.filter((_, i) => i !== imgIndex) || [];
+                                            setEditingUnit({ ...editingUnit, gallery_images: updatedGallery });
+                                          }}
+                                          className="absolute top-1 right-1 text-red-600"
+                                        >
+                                          <X className="h-3 w-3" />
+                                        </Button>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Brochure PDF */}
+                            <div className="space-y-2">
+                              <Label>Brochure (PDF)</Label>
+                              <div className="border-2 border-dashed border-gray-300 rounded-lg p-4">
+                                <input
+                                  type="file"
+                                  accept=".pdf"
+                                  onChange={(e) => handleEditingUnitFileUpload('brochure_pdf', e.target.files)}
+                                  className="hidden"
+                                  id={`edit-brochure-pdf-${(editingUnit as any).originalIndex}`}
+                                  disabled={uploading}
+                                />
+                                <label
+                                  htmlFor={`edit-brochure-pdf-${(editingUnit as any).originalIndex}`}
+                                  className="cursor-pointer flex flex-col items-center justify-center space-y-2"
+                                >
+                                  <FileText className="h-8 w-8 text-gray-400" />
+                                  <span className="text-sm text-gray-500">Click to upload brochure</span>
+                                </label>
+                                {editingUnit.brochure_pdf && (
+                                  <div className="mt-2 flex items-center justify-between bg-gray-100 p-2 rounded">
+                                    <span className="text-sm">Brochure uploaded</span>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => setEditingUnit({ ...editingUnit, brochure_pdf: '' })}
+                                      className="text-red-600"
+                                    >
+                                      <X className="h-3 w-3" />
+                                    </Button>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Video Tour URL */}
+                            <div className="space-y-2">
+                              <Label>Video Tour URL</Label>
+                              <Input
+                                value={editingUnit.video_tour_url || ''}
+                                onChange={(e) => setEditingUnit({ ...editingUnit, video_tour_url: e.target.value })}
+                                placeholder="https://youtube.com/watch?v=..."
+                              />
+                            </div>
+
+                            {/* Other Documents */}
+                            <div className="space-y-2 md:col-span-2">
+                              <Label>Other Documents</Label>
+                              <div className="border-2 border-dashed border-gray-300 rounded-lg p-4">
+                                <input
+                                  type="file"
+                                  accept=".pdf,.doc,.docx"
+                                  multiple
+                                  onChange={(e) => handleEditingUnitFileUpload('other_documents', e.target.files)}
+                                  className="hidden"
+                                  id={`edit-other-documents-${(editingUnit as any).originalIndex}`}
+                                  disabled={uploading}
+                                />
+                                <label
+                                  htmlFor={`edit-other-documents-${(editingUnit as any).originalIndex}`}
+                                  className="cursor-pointer flex flex-col items-center justify-center space-y-2"
+                                >
+                                  <FileText className="h-8 w-8 text-gray-400" />
+                                  <span className="text-sm text-gray-500">Click to upload documents</span>
+                                </label>
+                                {editingUnit.other_documents && editingUnit.other_documents.length > 0 && (
+                                  <div className="mt-2 space-y-2">
+                                    {editingUnit.other_documents.map((url, docIndex) => (
+                                      <div key={docIndex} className="flex items-center justify-between bg-gray-100 p-2 rounded">
+                                        <span className="text-sm">Document {docIndex + 1}</span>
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={() => {
+                                            const updatedDocs = editingUnit.other_documents?.filter((_, i) => i !== docIndex) || [];
+                                            setEditingUnit({ ...editingUnit, other_documents: updatedDocs });
+                                          }}
+                                          className="text-red-600"
+                                        >
+                                          <X className="h-3 w-3" />
+                                        </Button>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-end space-x-2 pt-4 border-t">
+                          <Button 
+                            onClick={handleCancelEdit}
+                            variant="outline"
+                          >
+                            Cancel
+                          </Button>
+                          <Button 
+                            onClick={handleUpdateUnit}
+                            style={{ backgroundColor: '#455560' }}
+                            className="text-white hover:opacity-90"
+                          >
+                            Save Changes
+                          </Button>
+                        </div>
+                      </div>
                    ) : (
                      // View mode
                      <div>
@@ -1256,8 +1745,25 @@ const UnifiedProjectForm = ({ formData, handleInputChange, handleArrayChange, ed
                          <div>
                            <span className="font-medium text-gray-600">Balcony:</span>
                            <p>{unit.has_balcony ? 'Yes' : 'No'}</p>
-                         </div>
-                       </div>
+                        </div>
+
+                        {(formData.amenities && formData.amenities.length > 0) && (
+                          <div className="mt-3">
+                            <span className="font-medium text-gray-600">Amenities:</span>
+                            <div className="flex flex-wrap gap-2 mt-1">
+                              {formData.amenities.map((a: string, idx: number) => {
+                                const match = amenityOptions?.find((opt: any) => opt.value === a || opt.code === a);
+                                const label = match ? match.value : a;
+                                return (
+                                  <span key={idx} className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs">
+                                    {label}
+                                  </span>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+                      </div>
                      </div>
                    )}
 
@@ -1277,11 +1783,11 @@ const UnifiedProjectForm = ({ formData, handleInputChange, handleArrayChange, ed
               ))}
             </div>
           )}
-        </CardContent>
-      </Card>
-      )}
-    </div>
-  );
-};
+         </CardContent>
+       </Card>
+       )}
+     </div>
+   );
+ };
 
-export default UnifiedProjectForm;
+ export default UnifiedProjectForm;

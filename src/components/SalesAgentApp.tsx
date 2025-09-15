@@ -7,13 +7,17 @@ import SalesAgentInbox from './SalesAgentInbox';
 import SalesAgentScheduleVisit from './SalesAgentScheduleVisit';
 import SalesAgentSavedProjects from './SalesAgentSavedProjects';
 import SalesAgentVisitsList from './SalesAgentVisitsList';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 const SalesAgentApp = () => {
   const { user, loading } = useSalesAgentAuth();
-  const [currentPage, setCurrentPage] = useState('ekarbot');
+  const [currentPage, setCurrentPage] = useState(() => localStorage.getItem('salesAgent.currentPage') || 'ekarbot');
   const [projects, setProjects] = useState<any[]>([]);
   const [n8nResponse, setN8nResponse] = useState<any>(null);
+
+  useEffect(() => {
+    localStorage.setItem('salesAgent.currentPage', currentPage);
+  }, [currentPage]);
 
   if (loading) {
     return (

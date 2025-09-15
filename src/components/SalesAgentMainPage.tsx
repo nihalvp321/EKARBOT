@@ -25,7 +25,10 @@ interface SalesAgentMainPageProps {
   setN8nResponse: (response: any) => void;
 }
 
-type ChatMode = 'inhouse' | 'chatgpt' | 'hybrid' | 'property-listing';
+// These types are correct as they were in your prompt
+type PropertyListingMode = 'inhouse' | 'external';
+type EkarBotMode = 'inhouse' | 'external';
+type ChatMode = 'chatgpt' | 'hybrid' | 'property-listing' | 'ekarbot-ai';
 
 const SalesAgentMainPage = ({
   projects,
@@ -42,7 +45,12 @@ const SalesAgentMainPage = ({
   const [savedProjectIds, setSavedProjectIds] = useState<string[]>([]);
   const [loadingProjects, setLoadingProjects] = useState(false);
   const [transcribedText, setTranscribedText] = useState<string>('');
-  const [chatMode, setChatMode] = useState<ChatMode>('inhouse');
+  
+  // State variables for chat modes
+  const [chatMode, setChatMode] = useState<ChatMode>('ekarbot-ai'); // Default to ekarbot-ai
+  const [propertyListingMode, setPropertyListingMode] = useState<PropertyListingMode>('external'); // Default to external for property-listing
+  const [ekarBotMode, setEkarBotMode] = useState<EkarBotMode>('inhouse'); // Default for ekarbot-ai
+
   const [showResponse, setShowResponse] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
 
@@ -64,7 +72,7 @@ const SalesAgentMainPage = ({
 
     if (isSending) {
       setSendStatus(statusMessages[0].text);
-      
+
       interval = setInterval(() => {
         currentIndex = (currentIndex + 1) % statusMessages.length;
         setSendStatus(statusMessages[currentIndex].text);
@@ -88,23 +96,29 @@ const SalesAgentMainPage = ({
     }
   }, [n8nResponse, isSending]);
 
-  /** Get webhook URL based on chat mode */
-  /** Get webhook URL based on chat mode */
-const getWebhookUrl = () => {
-  switch (chatMode) {
-    case 'inhouse':
-      return 'https://ekarbotproject.duckdns.org/webhook/inhouse';
-    case 'chatgpt':
-      return 'https://ekarbotproject.duckdns.org/webhook/chatgpt';
-    case 'hybrid':
-      return 'https://ekarbotproject.duckdns.org/webhook/hybrid';
-    case 'property-listing':
-      return 'https://ekarbotproject.duckdns.org/webhook/property-listing'; // ✅ new endpoint
-    default:
-      return '';
-  }
-};
+  /** Get webhook URL based on chat mode and sub-modes */
+  const getWebhookUrl = () => {
+    if (chatMode === 'property-listing') {
+      return propertyListingMode === 'inhouse'
+        ? 'https://ekarbotproject.duckdns.org/webhook/property-listing/inhouse'
+        : 'https://ekarbotproject.duckdns.org/webhook/property-listing/external';
+    }
 
+    if (chatMode === 'ekarbot-ai') {
+      return ekarBotMode === 'inhouse'
+        ? 'https://ekarbotproject.duckdns.org/webhook/ekarbot-ai/inhouse'
+        : 'https://ekarbotproject.duckdns.org/webhook/ekarbot-ai/external';
+    }
+
+    switch (chatMode) {
+      case 'chatgpt':
+        return 'https://ekarbotproject.duckdns.org/webhook/chatgpt';
+      case 'hybrid':
+        return 'https://ekarbotproject.duckdns.org/webhook/hybrid';
+      default:
+        return '';
+    }
+  };
   /** Fetch projects from Supabase */
   const fetchProjects = async (filterIds: string[] = []) => {
     try {
@@ -197,7 +211,7 @@ const getWebhookUrl = () => {
           sales_agent_id: profile.sales_agent_id,
           timestamp: new Date().toISOString(),
           source: 'sales_agent_main_page',
-          mode: chatMode
+          mode: chatMode === 'property-listing' ? `property-listing-${propertyListingMode}` : chatMode === 'ekarbot-ai' ? `ekarbot-ai-${ekarBotMode}` : chatMode
         })
       });
 
@@ -251,32 +265,47 @@ const getWebhookUrl = () => {
 
   const visibleProjects = sortedProjects.slice(0, visibleCount);
 
+  const handleChatModeChange = (mode: ChatMode) => {
+    setChatMode(mode);
+    if (mode === 'property-listing') {
+      setPropertyListingMode('external'); // Default to external
+    }
+    if (mode === 'ekarbot-ai') {
+      setEkarBotMode('inhouse'); // Default for ekarbot-ai
+    }
+  };
+
   const chatModeConfig = {
-  inhouse: {
-    label: 'EkarBot AI',
-    icon: MessageSquare,
-    description: 'Proprietary AI assistant',
-    gradient: 'from-gray-500 to-gray-600'
-  },
-  chatgpt: {
-    label: 'ChatGPT',
-    icon: Bot,
-    description: 'OpenAI ChatGPT integration',
-    gradient: 'from-gray-500 to-gray-600'
-  },
-  hybrid: {
-    label: 'Hybrid Power',
-    icon: Zap,
-    description: 'Combined AI intelligence',
-    gradient: 'from-gray-500 to-gray-600'
-  },
-  'property-listing': {   // ✅ needs quotes because of the hyphen
-    label: 'Property Listing',
-    icon: Building,
-    description: 'Fetch latest active listings',
-    gradient: 'from-gray-500 to-gray-600'
-  }
-};
+    'ekarbot-ai': {
+      label: 'EkarBot AI',
+      icon: MessageSquare,
+      description: `Proprietary AI assistant (${ekarBotMode})`,
+      gradient: 'from-gray-500 to-gray-600'
+    },
+    chatgpt: {
+      label: 'ChatGPT',
+      icon: Bot,
+      description: 'OpenAI ChatGPT integration',
+      gradient: 'from-gray-500 to-gray-600'
+    },
+    hybrid: {
+      label: 'Hybrid Power',
+      icon: Zap,
+      description: 'Combined AI intelligence',
+      gradient: 'from-gray-500 to-gray-600'
+    },
+    'property-listing': {
+      label: 'Property Listing',
+      icon: Building,
+      description: `Fetch latest active listings (${propertyListingMode})`,
+      gradient: 'from-gray-500 to-gray-600'
+    }
+  };
+
+  // Fallback logo in case the primary logo fails to load
+  const handleLogoError = () => {
+    toast.error('Failed to load logo', { style: { background: '#fef2f2' } });
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
@@ -289,6 +318,11 @@ const getWebhookUrl = () => {
                 src="/lovable-uploads/00baa288-f375-4798-aa52-0272029ed647.png"
                 alt="EkarBot"
                 className="h-12 w-auto animate-bounce"
+                onError={handleLogoError}
+                // Fallback to a default image or placeholder if the primary image fails
+                onErrorCapture={(e) => {
+                  e.currentTarget.src = '/placeholder-logo.png'; // Ensure you have a placeholder image in the public folder
+                }}
               />
               <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
             </div>
@@ -328,7 +362,7 @@ const getWebhookUrl = () => {
                       key={mode}
                       variant={isActive ? "default" : "outline"}
                       size="lg"
-                      onClick={() => setChatMode(mode)}
+                      onClick={() => handleChatModeChange(mode)}
                       className={`flex items-center gap-3 px-6 py-3 rounded-xl transition-all duration-300 transform hover:scale-105 ${
                         isActive 
                           ? `bg-gradient-to-r ${config.gradient} text-white shadow-lg border-0 hover:shadow-xl` 
@@ -342,7 +376,46 @@ const getWebhookUrl = () => {
                   );
                 })}
               </div>
-
+              {(chatMode === 'property-listing' || chatMode === 'ekarbot-ai') && (
+                <div className="flex gap-2 mt-2">
+                  <Button
+                    variant={chatMode === 'property-listing' ? (propertyListingMode === 'inhouse' ? 'default' : 'outline') : (chatMode === 'ekarbot-ai' ? (ekarBotMode === 'inhouse' ? 'default' : 'outline') : 'outline')}
+                    size="sm"
+                    onClick={() => {
+                      if (chatMode === 'property-listing') setPropertyListingMode('inhouse');
+                      else setEkarBotMode('inhouse');
+                    }}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-all duration-300 transform hover:scale-105 ${
+                      chatMode === 'property-listing' ? (propertyListingMode === 'inhouse'
+                        ? 'bg-gradient-to-r from-gray-500 to-gray-600 text-white shadow-lg border-0 hover:shadow-xl'
+                        : 'hover:bg-gray-50 border-gray-200 hover:border-gray-300') : (chatMode === 'ekarbot-ai' ? (ekarBotMode === 'inhouse'
+                        ? 'bg-gradient-to-r from-gray-500 to-gray-600 text-white shadow-lg border-0 hover:shadow-xl'
+                        : 'hover:bg-gray-50 border-gray-200 hover:border-gray-300') : 'hover:bg-gray-50 border-gray-200 hover:border-gray-300')
+                    }`}
+                    disabled={isSending}
+                  >
+                    Inhouse
+                  </Button>
+                  <Button
+                    variant={chatMode === 'property-listing' ? (propertyListingMode === 'external' ? 'default' : 'outline') : (chatMode === 'ekarbot-ai' ? (ekarBotMode === 'external' ? 'default' : 'outline') : 'outline')}
+                    size="sm"
+                    onClick={() => {
+                      if (chatMode === 'property-listing') setPropertyListingMode('external');
+                      else setEkarBotMode('external');
+                    }}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-all duration-300 transform hover:scale-105 ${
+                      chatMode === 'property-listing' ? (propertyListingMode === 'external'
+                        ? 'bg-gradient-to-r from-gray-500 to-gray-600 text-white shadow-lg border-0 hover:shadow-xl'
+                        : 'hover:bg-gray-50 border-gray-200 hover:border-gray-300') : (chatMode === 'ekarbot-ai' ? (ekarBotMode === 'external'
+                        ? 'bg-gradient-to-r from-gray-500 to-gray-600 text-white shadow-lg border-0 hover:shadow-xl'
+                        : 'hover:bg-gray-50 border-gray-200 hover:border-gray-300') : 'hover:bg-gray-50 border-gray-200 hover:border-gray-300')
+                    }`}
+                    disabled={isSending}
+                  >
+                    External
+                  </Button>
+                </div>
+              )}
               {/* Active Mode Info */}
               <div className="mt-4 p-3 bg-white rounded-lg border border-blue-200 shadow-sm">
                 <div className="flex items-center gap-2">
@@ -425,48 +498,48 @@ const getWebhookUrl = () => {
 
         {/* Response Cards */}
         {n8nResponse?.type === 'single' && n8nResponse.content && showResponse && (
-  <Card className="shadow-xl border-0 bg-gradient-to-r from-blue-50 to-indigo-50 animate-slide-in-up">
-    <CardHeader className="flex flex-row items-center justify-between">
-      <CardTitle className="text-xl font-bold flex items-center gap-3 text-blue-800">
-        <div className="p-2 bg-blue-200 rounded-full">
-          <Bot className="h-6 w-6" />
-        </div>
-        EkarBot Response
-      </CardTitle>
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={clearResponse}
-        className="text-gray-500 hover:text-gray-700"
-      >
-        <X className="w-4 h-4" />
-      </Button>
-    </CardHeader>
-    <CardContent className="space-y-4">
-      {lastPrompt && (
-        <div className="bg-white p-4 rounded-xl border border-blue-200 shadow-sm">
-          <p className="font-semibold text-gray-700 mb-2">Your Question:</p>
-          <p className="text-gray-600 italic">"{lastPrompt}"</p>
-        </div>
-      )}
+          <Card className="shadow-xl border-0 bg-gradient-to-r from-blue-50 to-indigo-50 animate-slide-in-up">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="text-xl font-bold flex items-center gap-3 text-blue-800">
+                <div className="p-2 bg-blue-200 rounded-full">
+                  <Bot className="h-6 w-6" />
+                </div>
+                EkarBot Response
+              </CardTitle>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={clearResponse}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {lastPrompt && (
+                <div className="bg-white p-4 rounded-xl border border-blue-200 shadow-sm">
+                  <p className="font-semibold text-gray-700 mb-2">Your Question:</p>
+                  <p className="text-gray-600 italic">"{lastPrompt}"</p>
+                </div>
+              )}
 
-      <div className={`bg-white p-6 rounded-xl border border-blue-200 shadow-sm ${isTyping ? 'animate-pulse' : 'animate-fade-in'}`}>
-        <div className="prose max-w-none">
-          <ul className="list-disc list-inside text-gray-800 text-lg leading-relaxed">
-            {n8nResponse.content
-              .split(/\n|\. /) // split by newlines or sentences
-              .filter(Boolean) // remove empty items
-              .map((point, idx) => (
-                <li key={idx} className="mb-2 break-words">
-                  {point.trim()}
-                </li>
-              ))}
-          </ul>
-        </div>
-      </div>
-    </CardContent>
-  </Card>
-)}
+              <div className={`bg-white p-6 rounded-xl border border-blue-200 shadow-sm ${isTyping ? 'animate-pulse' : 'animate-fade-in'}`}>
+                <div className="prose max-w-none">
+                  <ul className="list-disc list-inside text-gray-800 text-lg leading-relaxed">
+                    {n8nResponse.content
+                      .split(/\n|\. /) // split by newlines or sentences
+                      .filter(Boolean) // remove empty items
+                      .map((point, idx) => (
+                        <li key={idx} className="mb-2 break-words">
+                          {point.trim()}
+                        </li>
+                      ))}
+                  </ul>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Multiple Project Suggestions */}
         {!loadingProjects &&
@@ -544,7 +617,7 @@ const getWebhookUrl = () => {
                             {project.source}
                           </Badge>
                           <Badge variant="outline" className="text-xs px-3 py-1 border-gray-300 text-gray-600 rounded-full">
-                            {project.project_type}
+                            {project.project_ztype}
                           </Badge>
                         </div>
                       </CardHeader>

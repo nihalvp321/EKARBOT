@@ -46,7 +46,7 @@ export const validateInput = (input: string): boolean => {
 };
 
 export const validateProjectTitle = (title: string): boolean => {
-  return title.length >= 3 && title.length <= 200 && /^[a-zA-Z0-9\s\-_.,()]+$/.test(title);
+  return title.length >= 3 && title.length <= 200 && /^[a-zA-Z0-9\s\-_.,()]+$/i.test(title);
 };
 
 export const validatePhoneNumber = (phone: string): boolean => {
@@ -55,7 +55,7 @@ export const validatePhoneNumber = (phone: string): boolean => {
 };
 
 export const validateFileUpload = (file: File): { isValid: boolean; error?: string } => {
-  const maxSize = 10 * 1024 * 1024; // 10MB
+  const maxSize = 50 * 1024 * 1024; // 50MB
   const allowedTypes = [
     'image/jpeg',
     'image/png',
@@ -66,7 +66,7 @@ export const validateFileUpload = (file: File): { isValid: boolean; error?: stri
   ];
   
   if (file.size > maxSize) {
-    return { isValid: false, error: 'File size must be less than 10MB' };
+    return { isValid: false, error: 'File size must be less than 50MB' };
   }
   
   if (!allowedTypes.includes(file.type)) {

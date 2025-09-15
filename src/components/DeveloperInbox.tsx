@@ -247,13 +247,92 @@ const DeveloperInbox = () => {
   };
 
   if (loading) {
-    return (
-      <div className="h-[calc(100vh-140px)] bg-gray-50 flex items-center justify-center">
-        <div className="text-lg">Loading conversations...</div>
+  return (
+    <div className="flex items-center justify-center min-h-[400px] flex-col space-y-8">
+      {/* Morphing blob animation with logo */}
+      <div className="relative">
+        {/* Animated blob background */}
+        <div className="w-24 h-24 bg-gradient-to-br from-blue-400/20 via-purple-500/15 to-indigo-600/20 rounded-full relative overflow-hidden"
+             style={{
+               animation: 'morph 4s ease-in-out infinite',
+               filter: 'blur(1px)'
+             }}>
+          <div className="absolute inset-2 bg-gradient-to-tr from-cyan-400/30 to-pink-500/25 rounded-full"
+               style={{animation: 'morph 3s ease-in-out infinite reverse'}}></div>
+        </div>
+        
+        {/* Floating particles */}
+        <div className="absolute inset-0 w-24 h-24">
+          {[...Array(6)].map((_, i) => (
+            <div key={i} 
+                 className="absolute w-1 h-1 bg-blue-400 rounded-full opacity-60"
+                 style={{
+                   top: `${20 + i * 10}%`,
+                   left: `${15 + i * 12}%`,
+                   animation: `float ${2 + i * 0.3}s ease-in-out infinite`,
+                   animationDelay: `${i * 0.2}s`
+                 }}></div>
+          ))}
+        </div>
+        
+        {/* Logo with breathing effect */}
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="relative"
+               style={{animation: 'breathe 2.5s ease-in-out infinite'}}>
+            <img 
+              src="/lovable-uploads/00baa288-f375-4798-aa52-0272029ed647.png"
+              alt="EkarBot"
+              className="w-10 h-10 relative z-10"
+            />
+            <div className="absolute inset-0 bg-white/30 rounded-lg blur-sm transform scale-110 -z-10"
+                 style={{animation: 'glow 2s ease-in-out infinite alternate'}}></div>
+          </div>
+        </div>
       </div>
-    );
-  }
-
+      
+      <style jsx>{`
+        @keyframes morph {
+          0%, 100% { border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%; transform: rotate(0deg) scale(1); }
+          25% { border-radius: 30% 60% 70% 40% / 50% 60% 30% 60%; transform: rotate(90deg) scale(1.05); }
+          50% { border-radius: 50% 60% 30% 60% / 30% 60% 70% 40%; transform: rotate(180deg) scale(0.95); }
+          75% { border-radius: 60% 40% 60% 30% / 70% 30% 60% 70%; transform: rotate(270deg) scale(1.02); }
+        }
+        
+        @keyframes float {
+          0%, 100% { transform: translateY(0px) translateX(0px) scale(1); opacity: 0.6; }
+          33% { transform: translateY(-8px) translateX(4px) scale(1.1); opacity: 0.8; }
+          66% { transform: translateY(4px) translateX(-6px) scale(0.9); opacity: 0.4; }
+        }
+        
+        @keyframes breathe {
+          0%, 100% { transform: scale(1) rotate(0deg); }
+          50% { transform: scale(1.1) rotate(2deg); }
+        }
+        
+        @keyframes glow {
+          0% { opacity: 0.3; transform: scale(1.1); }
+          100% { opacity: 0.6; transform: scale(1.3); }
+        }
+      `}</style>
+      
+      {/* Modern text with shimmer effect */}
+      <div className="relative overflow-hidden">
+        <div className="text-xl font-medium text-gray-700 bg-gradient-to-r from-gray-700 via-gray-900 to-gray-700 bg-clip-text text-transparent animate-pulse">
+          Loading Conversation...
+        </div>
+        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer"></div>
+      </div>
+      
+      {/* Progress dots */}
+      <div className="flex space-x-2">
+        <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></div>
+        <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce [animation-delay:0.1s]"></div>
+        <div className="w-2 h-2 bg-purple-500 rounded-full animate-bounce [animation-delay:0.2s]"></div>
+        <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce [animation-delay:0.3s]"></div>
+      </div>
+    </div>
+  );
+}
   return (
     <div className="h-[calc(100vh-140px)] bg-gray-50">
       <div className="h-full flex">

@@ -1,5 +1,6 @@
 
 import { Routes, Route, Navigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
 import { DeveloperAuthProvider, useDeveloperAuth } from '@/hooks/useDeveloperAuth';
 import DeveloperLoginPage from './DeveloperLoginPage';
 import DeveloperLayout from './DeveloperLayout';
@@ -12,6 +13,11 @@ import ProjectForm from './ProjectForm';
 
 const DeveloperAppContent = () => {
   const { user, loading } = useDeveloperAuth();
+  const [currentPage, setCurrentPage] = useState(() => localStorage.getItem('developer.currentPage') || 'add-project');
+
+  useEffect(() => {
+    localStorage.setItem('developer.currentPage', currentPage);
+  }, [currentPage]);
 
   if (loading) {
     return (
@@ -28,7 +34,7 @@ const DeveloperAppContent = () => {
   return (
     <DeveloperLayout>
       <Routes>
-        <Route path="/" element={<Navigate to="/developer/add-project" replace />} />
+        <Route path="/" element={<Navigate to={`/developer/${currentPage}`} replace />} />
         <Route path="/add-project" element={<ProjectForm />} />
         <Route path="/projects" element={<MyProjects />} />
         <Route path="/inbox" element={<DeveloperInbox />} />

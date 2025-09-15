@@ -10,6 +10,8 @@ import { Trash2, Plus, Upload, X, FileText, Image } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { validateProjectTitle, validatePhoneNumber, validateEmail, validateFileUpload } from '@/utils/inputValidation';
+import EditableUnitCard from './EditableUnitCard';
+import { useDropdownOptions } from '@/components/hooks/useDropdownOptions';
 
 interface Unit {
   id?: string;
@@ -24,6 +26,7 @@ interface Unit {
   price_per_sqft: number;
   service_charges: number;
   payment_plan: string;
+  amenities?: string[];
 }
 
 interface ProjectUnitsAndPricingProps {
@@ -58,7 +61,8 @@ const ProjectUnitsAndPricing = ({
     starting_price_aed: 0,
     price_per_sqft: 0,
     service_charges: 0,
-    payment_plan: ''
+    payment_plan: '',
+    amenities: []
   });
 
   useEffect(() => {
@@ -71,21 +75,9 @@ const ProjectUnitsAndPricing = ({
     return `${prefix}${timestamp}`;
   };
 
-  const bedroomOptions = [
-    { value: 'Studio', label: 'Studio' },
-    { value: '1 Bedroom', label: '1 Bedroom' },
-    { value: '2 Bedrooms', label: '2 Bedrooms' },
-    { value: '3 Bedrooms', label: '3 Bedrooms' },
-    { value: '4 Bedrooms', label: '4 Bedrooms' },
-    { value: '5+ Bedrooms', label: '5+ Bedrooms' }
-  ];
+  const { options: bedroomOptions } = useDropdownOptions('bedroom_range');
+  const { options: bathroomOptions } = useDropdownOptions('bathroom_range');
 
-  const bathroomOptions = [
-    { value: '1 Bathroom', label: '1 Bathroom' },
-    { value: '2 Bathrooms', label: '2 Bathrooms' },
-    { value: '3 Bathrooms', label: '3 Bathrooms' },
-    { value: '4+ Bathrooms', label: '4+ Bathrooms' }
-  ];
 
   const furnishingOptions = [
     { value: 'Unfurnished', label: 'Unfurnished' },
@@ -218,7 +210,8 @@ const ProjectUnitsAndPricing = ({
       starting_price_aed: 0,
       price_per_sqft: 0,
       service_charges: 0,
-      payment_plan: ''
+      payment_plan: '',
+      amenities: []
     });
 
     toast.success('Unit added successfully');
@@ -229,6 +222,14 @@ const ProjectUnitsAndPricing = ({
     setCurrentUnits(updatedUnits);
     onUnitsChange(updatedUnits);
     toast.success('Unit removed successfully');
+  };
+
+  const handleUpdateUnit = (index: number, updatedUnit: Unit) => {
+    const updatedUnits = [...currentUnits];
+    updatedUnits[index] = updatedUnit;
+    setCurrentUnits(updatedUnits);
+    onUnitsChange(updatedUnits);
+    toast.success('Unit updated successfully');
   };
 
   const formatPrice = (price: number): string => {
@@ -303,9 +304,14 @@ const ProjectUnitsAndPricing = ({
                     <SelectValue placeholder="Select bedrooms" />
                   </SelectTrigger>
                   <SelectContent className="bg-white z-50">
+                    {newUnit.bedrooms_range && !bedroomOptions.some(o => o.value === newUnit.bedrooms_range) && (
+                      <SelectItem key="current-bedroom" value={newUnit.bedrooms_range}>
+                        {newUnit.bedrooms_range}
+                      </SelectItem>
+                    )}
                     {bedroomOptions.map((option) => (
                       <SelectItem key={option.value} value={option.value}>
-                        {option.label}
+                        {option.value}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -319,9 +325,14 @@ const ProjectUnitsAndPricing = ({
                     <SelectValue placeholder="Select bathrooms" />
                   </SelectTrigger>
                   <SelectContent className="bg-white z-50">
+                    {newUnit.bathrooms_range && !bathroomOptions.some(o => o.value === newUnit.bathrooms_range) && (
+                      <SelectItem key="current-bathroom" value={newUnit.bathrooms_range}>
+                        {newUnit.bathrooms_range}
+                      </SelectItem>
+                    )}
                     {bathroomOptions.map((option) => (
                       <SelectItem key={option.value} value={option.value}>
-                        {option.label}
+                        {option.value}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -372,6 +383,7 @@ const ProjectUnitsAndPricing = ({
               </div>
             </div>
           </div>
+
 
           {/* Pricing Details Section */}
           <div>
@@ -447,63 +459,13 @@ const ProjectUnitsAndPricing = ({
           ) : (
             <div className="space-y-4">
               {currentUnits.map((unit, index) => (
-                <div key={unit.id || index} className="border rounded-lg p-4 bg-gray-50">
-                  <div className="flex justify-between items-start mb-3">
-                    <h4 className="font-semibold text-gray-800">{unit.unit_code}</h4>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleRemoveUnit(index)}
-                      className="text-red-600 hover:text-red-800"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 text-sm">
-                    <div>
-                      <span className="font-medium text-gray-600">Bedrooms:</span>
-                      <p>{unit.bedrooms_range || 'Not specified'}</p>
-                    </div>
-                    <div>
-                      <span className="font-medium text-gray-600">Bathrooms:</span>
-                      <p>{unit.bathrooms_range || 'Not specified'}</p>
-                    </div>
-                    <div>
-                      <span className="font-medium text-gray-600">Size:</span>
-                      <p>{unit.unit_size_range || 'Not specified'}</p>
-                    </div>
-                    <div>
-                      <span className="font-medium text-gray-600">Starting Price:</span>
-                      <p className="text-blue-600 font-semibold">
-                        AED {unit.starting_price_aed ? formatPrice(unit.starting_price_aed) : '0'}
-                      </p>
-                    </div>
-                    <div>
-                      <span className="font-medium text-gray-600">Furnishing:</span>
-                      <p>{unit.furnishing_status || 'Not specified'}</p>
-                    </div>
-                    <div>
-                      <span className="font-medium text-gray-600">Ownership:</span>
-                      <p>{unit.ownership_type || 'Not specified'}</p>
-                    </div>
-                    <div>
-                      <span className="font-medium text-gray-600">Balcony:</span>
-                      <p>{unit.has_balcony ? 'Yes' : 'No'}</p>
-                    </div>
-                    <div>
-                      <span className="font-medium text-gray-600">Price/sqft:</span>
-                      <p>AED {unit.price_per_sqft || '0'}</p>
-                    </div>
-                  </div>
-                  
-                  {unit.payment_plan && (
-                    <div className="mt-3">
-                      <span className="font-medium text-gray-600">Payment Plan:</span>
-                      <p className="text-sm">{unit.payment_plan}</p>
-                    </div>
-                  )}
-                </div>
+                <EditableUnitCard
+                  key={unit.id || unit.unit_code || index}
+                  unit={unit}
+                  index={index}
+                  onUpdate={handleUpdateUnit}
+                  onRemove={handleRemoveUnit}
+                />
               ))}
             </div>
           )}

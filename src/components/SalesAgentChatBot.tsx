@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
-import { 
+import {
   Send, Bot, User, Zap, Sparkles, X, Minimize2, Maximize2, MessageSquare
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -43,6 +43,7 @@ interface Message {
 }
 
 type ChatMode = 'inhouse' | 'chatgpt' | 'hybrid' | 'property-listing';
+type PropertyListingMode = 'inhouse' | 'external';
 
 const SalesAgentChatBot = () => {
   const [messages, setMessages] = useState<Message[]>([
@@ -57,6 +58,7 @@ const SalesAgentChatBot = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [sendStatus, setSendStatus] = useState<string | null>(null);
   const [chatMode, setChatMode] = useState<ChatMode>('inhouse');
+  const [propertyListingMode, setPropertyListingMode] = useState<PropertyListingMode>('inhouse');
   const [searchState, setSearchState] = useState<{
     query: string;
     allProjects: ProjectWithSimilarity[];
@@ -102,23 +104,24 @@ const SalesAgentChatBot = () => {
     };
   }, [isLoading]);
 
-  /** Get webhook URL based on chat mode */
-  /** Get webhook URL based on chat mode */
-const getWebhookUrl = () => {
-  switch (chatMode) {
-    case 'inhouse':
-      return 'https://ekarbotproject.duckdns.org/webhook/inhouse';
-    case 'chatgpt':
-      return 'https://ekarbotproject.duckdns.org/webhook/chatgpt';
-    case 'hybrid':
-      return 'https://ekarbotproject.duckdns.org/webhook/hybrid';
-    case 'property-listing':
-      return 'https://ekarbotproject.duckdns.org/webhook/property-listing';
-    default:
-      return '';
-  }
-};
-
+  /** Get webhook URL based on chat mode and property listing sub-mode */
+  const getWebhookUrl = () => {
+    if (chatMode === 'property-listing') {
+      return propertyListingMode === 'inhouse'
+        ? 'https://shafil.app.n8n.cloud/webhook-test/property-listing/inhouse'
+        : 'https://shafil.app.n8n.cloud/webhook-test/property-listing/external';
+    }
+    switch (chatMode) {
+      case 'inhouse':
+        return 'https://shafil.app.n8n.cloud/webhook-test/property-listing/inhouse';
+      case 'chatgpt':
+        return 'https://ekarbotproject.duckdns.org/webhook/chatgpt';
+      case 'hybrid':
+        return 'https://ekarbotproject.duckdns.org/webhook/hybrid';
+      default:
+        return '';
+    }
+  };
 
   const savePromptToDatabase = async (promptText: string) => {
     try {
@@ -227,7 +230,7 @@ const getWebhookUrl = () => {
         sales_agent_id: profile.sales_agent_id,
         timestamp: new Date().toISOString(),
         source: 'sales_agent_chatbot',
-        mode: chatMode,
+        mode: chatMode === 'property-listing' ? `property-listing-${propertyListingMode}` : chatMode,
       };
       const response = await fetch(getWebhookUrl(), {
         method: 'POST',
@@ -376,47 +379,54 @@ const getWebhookUrl = () => {
     setSearchState(null);
   };
 
- const chatModeConfig: Record<ChatMode, {
-  label: string;
-  icon: any;
-  description: string;
-  gradient: string;
-  bgColor: string;
-  textColor: string;
-}> = {
-  inhouse: {
-    label: 'EkarBot AI',
-    icon: MessageSquare,
-    description: 'Our proprietary AI assistant',
-    gradient: 'from-blue-500 to-blue-600',
-    bgColor: 'bg-blue-100',
-    textColor: 'text-blue-700',
-  },
-  chatgpt: {
-    label: 'ChatGPT',
-    icon: Bot,
-    description: 'OpenAI ChatGPT integration',
-    gradient: 'from-green-500 to-green-600',
-    bgColor: 'bg-green-100',
-    textColor: 'text-green-700',
-  },
-  hybrid: {
-    label: 'Hybrid Power',
-    icon: Zap,
-    description: 'Combined AI intelligence',
-    gradient: 'from-purple-500 to-purple-600',
-    bgColor: 'bg-purple-100',
-    textColor: 'text-purple-700',
-  },
-  'property-listing': {
-    label: 'Property Listing',
-    icon: Bot, // you can swap with Building if imported
-    description: 'Fetch latest active listings',
-    gradient: 'from-pink-500 to-pink-600',
-    bgColor: 'bg-pink-100',
-    textColor: 'text-pink-700',
-  },
-};
+  const chatModeConfig: Record<ChatMode, {
+    label: string;
+    icon: any;
+    description: string;
+    gradient: string;
+    bgColor: string;
+    textColor: string;
+  }> = {
+    inhouse: {
+      label: 'EkarBot AI',
+      icon: MessageSquare,
+      description: 'Our proprietary AI assistant',
+      gradient: 'from-blue-500 to-blue-600',
+      bgColor: 'bg-blue-100',
+      textColor: 'text-blue-700',
+    },
+    chatgpt: {
+      label: 'ChatGPT',
+      icon: Bot,
+      description: 'OpenAI ChatGPT integration',
+      gradient: 'from-green-500 to-green-600',
+      bgColor: 'bg-green-100',
+      textColor: 'text-green-700',
+    },
+    hybrid: {
+      label: 'Hybrid Power',
+      icon: Zap,
+      description: 'Combined AI intelligence',
+      gradient: 'from-purple-500 to-purple-600',
+      bgColor: 'bg-purple-100',
+      textColor: 'text-purple-700',
+    },
+    'property-listing': {
+      label: 'Property Listing',
+      icon: Bot,
+      description: `Fetch latest active listings (${propertyListingMode})`,
+      gradient: 'from-pink-500 to-pink-600',
+      bgColor: 'bg-pink-100',
+      textColor: 'text-pink-700',
+    },
+  };
+
+  const handleChatModeChange = (mode: ChatMode) => {
+    setChatMode(mode);
+    if (mode === 'property-listing') {
+      setPropertyListingMode('inhouse');
+    }
+  };
 
   const currentModeConfig = chatModeConfig[chatMode];
 
@@ -493,7 +503,7 @@ const getWebhookUrl = () => {
                     key={mode}
                     variant={isActive ? 'default' : 'outline'}
                     size="sm"
-                    onClick={() => setChatMode(mode)}
+                    onClick={() => handleChatModeChange(mode)}
                     className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-all duration-300 transform hover:scale-105 ${
                       isActive
                         ? `bg-gradient-to-r ${config.gradient} text-white shadow-lg border-0 hover:shadow-xl`
@@ -506,8 +516,38 @@ const getWebhookUrl = () => {
                 );
               })}
             </div>
+            {chatMode === 'property-listing' && (
+              <div className="flex gap-2 mt-2">
+                <Button
+                  variant={propertyListingMode === 'inhouse' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setPropertyListingMode('inhouse')}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-all duration-300 transform hover:scale-105 ${
+                    propertyListingMode === 'inhouse'
+                      ? 'bg-gradient-to-r from-pink-500 to-pink-600 text-white shadow-lg border-0 hover:shadow-xl'
+                      : 'hover:bg-pink-50 border-pink-200 hover:border-pink-300'
+                  }`}
+                  disabled={isLoading}
+                >
+                  Inhouse
+                </Button>
+                <Button
+                  variant={propertyListingMode === 'external' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setPropertyListingMode('external')}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-all duration-300 transform hover:scale-105 ${
+                    propertyListingMode === 'external'
+                      ? 'bg-gradient-to-r from-pink-500 to-pink-600 text-white shadow-lg border-0 hover:shadow-xl'
+                      : 'hover:bg-pink-50 border-pink-200 hover:border-pink-300'
+                  }`}
+                  disabled={isLoading}
+                >
+                  External
+                </Button>
+              </div>
+            )}
             <div
-              className={`p-3 rounded-lg border shadow-sm ${currentModeConfig.bgColor} border-opacity-50`}
+              className={`p-3 rounded-lg border shadow-sm ${currentModeConfig.bgColor} border-opacity-50 mt-2`}
             >
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
@@ -553,7 +593,6 @@ const getWebhookUrl = () => {
                     {message.timestamp.toLocaleTimeString()}
                   </p>
                 </div>
-
                 {message.role === 'user' && (
                   <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center flex-shrink-0">
                     <User className="w-4 h-4 text-gray-600" />
@@ -561,7 +600,6 @@ const getWebhookUrl = () => {
                 )}
               </div>
             ))}
-
             {isLoading && (
               <div className="flex gap-3">
                 <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
@@ -582,7 +620,6 @@ const getWebhookUrl = () => {
                 </div>
               </div>
             )}
-
             <div ref={messagesEndRef} />
           </div>
 

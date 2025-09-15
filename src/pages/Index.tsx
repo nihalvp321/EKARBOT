@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { SecureAuthProvider, useSecureAuth } from '@/hooks/useSecureAuth';
 import LoginPage from '@/components/LoginPage';
 import Layout from '@/components/Layout';
@@ -11,8 +11,12 @@ import UserManagerInbox from '@/components/UserManagerInbox';
 import ProjectDropdownSettings from '@/components/ProjectDropdownSettings';
 
 const AppContent = () => {
-  const [currentPage, setCurrentPage] = useState('developers');
+  const [currentPage, setCurrentPage] = useState(() => localStorage.getItem('userManager.currentPage') || 'developers');
   const { user, loading } = useSecureAuth();
+
+  useEffect(() => {
+    localStorage.setItem('userManager.currentPage', currentPage);
+  }, [currentPage]);
 
   const handleNavigate = (page: string) => {
     console.log('Navigating to:', page);

@@ -218,7 +218,7 @@ const SalesAgentScheduleVisit = () => {
                   </Label>
                   <Select onValueChange={handleProjectSelect} disabled={projectsLoading}>
                     <SelectTrigger className="h-12 border-2 border-gray-200 hover:border-blue-300 transition-colors duration-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200">
-                      <SelectValue placeholder={projectsLoading ? "Loading projects..." : "Choose a project"} />
+                      <SelectValue placeholder={projectsLoading ? "Loading visits list..." : "Choose a project"} />
                     </SelectTrigger>
                     <SelectContent className="max-h-60">
                       {savedProjectIds.length > 0 && (

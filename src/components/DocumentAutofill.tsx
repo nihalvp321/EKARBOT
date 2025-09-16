@@ -67,7 +67,7 @@ const DocumentAutofill = ({ onAutoFillData }: DocumentAutofillProps) => {
       formData.append('fileType', file.type);
       
       // Call the n8n webhook for document parsing
-      const response = await fetch('https://ekarbotproject.duckdns.org/webhook-test/document-parsing', {
+      const response = await fetch('https://ekarbotproject.duckdns.org/webhook/document-parsing', {
         method: 'POST',
         body: formData // Send as FormData (binary file)
       });

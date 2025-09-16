@@ -201,11 +201,63 @@ const ProjectFormContainer = ({ editProject, onSave, autoFillData }: ProjectForm
     return baseData;
   };
 
-  const [formData, setFormData] = useState<ProjectFormData>(initializeFormData);
+  const [formData, setFormData] = useState<ProjectFormData>(() => {
+    // Restore draft from localStorage if available and not editing
+    if (!editProject) {
+      const saved = localStorage.getItem('developer.addProject.formData');
+      if (saved) {
+        try {
+          const restored = JSON.parse(saved);
+          console.log('Restored formData from localStorage:', restored);
+          // Ensure units array exists and is properly restored
+          if (restored.units && Array.isArray(restored.units)) {
+            console.log('Restored units:', restored.units.length);
+            return restored;
+          }
+        } catch (e) {
+          console.warn('Failed to parse saved draft form data:', e);
+        }
+      }
+    }
+    return initializeFormData();
+  });
   const [files, setFiles] = useState<{ [key: string]: File[] }>({});
   const [importMode, setImportMode] = useState<'none' | 'excel' | 'media'>('none');
   const [importedProjectData, setImportedProjectData] = useState<any>(null);
 
+  // Persist form data draft (including units) to localStorage
+  useEffect(() => {
+    if (!editProject) {
+      try {
+        localStorage.setItem('developer.addProject.formData', JSON.stringify(formData));
+      } catch (e) {
+        console.warn('Failed to save draft form data:', e);
+      }
+    }
+  }, [formData, editProject]);
+
+  // Normalize amenities to array to prevent runtime errors
+  useEffect(() => {
+    const amenities: any = (formData as any).amenities;
+    if (!Array.isArray(amenities)) {
+      let normalized: string[] = [];
+      if (typeof amenities === 'string') {
+        try {
+          const parsed = JSON.parse(amenities);
+          if (Array.isArray(parsed)) {
+            normalized = parsed as string[];
+          } else if (amenities.trim()) {
+            normalized = amenities.split(',').map((s: string) => s.trim()).filter(Boolean);
+          }
+        } catch {
+          if (amenities.trim()) {
+            normalized = amenities.split(',').map((s: string) => s.trim()).filter(Boolean);
+          }
+        }
+      }
+      setFormData(prev => ({ ...prev, amenities: normalized }));
+    }
+  }, [formData.amenities]);
   // Re-initialize form data when editProject changes
   useEffect(() => {
     console.log('EditProject changed, re-initializing form data:', editProject);
@@ -268,12 +320,22 @@ const ProjectFormContainer = ({ editProject, onSave, autoFillData }: ProjectForm
     }
   }, [autoFillData, profile?.developer_name]);
 
+  const [lastAutoFillData, setLastAutoFillData] = useState<any>(null);
+
   const handleAutoFillData = (extractedData: any) => {
+    console.log('Applying autofill data:', extractedData);
+    
+    // Apply data to main form fields
     setFormData(prev => ({
       ...prev,
       developer_name: profile?.developer_name || prev.developer_name,
       ...extractedData
     }));
+    
+    // Store the autofill data to pass to UnifiedProjectForm
+    setLastAutoFillData(extractedData);
+    
+    toast.success('Document data applied! Now available in unit form fields.');
   };
 
   const handleExcelImport = async (data: any, appendUnits = false) => {
@@ -453,6 +515,7 @@ const ProjectFormContainer = ({ editProject, onSave, autoFillData }: ProjectForm
   };
 
   const handleInputChange = (field: string, value: string | boolean | string[] | any[] | ContactInfo[] | Date) => {
+    console.log(`Updating formData field ${field}:`, value);
     setFormData(prev => ({
       ...prev,
       [field]: value
@@ -682,6 +745,8 @@ const ProjectFormContainer = ({ editProject, onSave, autoFillData }: ProjectForm
 
         await Promise.all(projectCreationPromises);
         toast.success(`${formData.units.length} project(s) created successfully!`);
+        // Clear draft after successful creation
+        localStorage.removeItem('developer.addProject.formData');
 
       } else if (editProject) {
         // Update existing project
@@ -795,6 +860,7 @@ const ProjectFormContainer = ({ editProject, onSave, autoFillData }: ProjectForm
         handleInputChange={handleInputChange} 
         handleArrayChange={handleArrayChange}
         editProject={editProject}
+        autoFillData={lastAutoFillData}
       />
     },
     {

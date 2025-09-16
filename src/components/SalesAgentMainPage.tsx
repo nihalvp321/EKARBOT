@@ -106,7 +106,7 @@ const SalesAgentMainPage = ({
 
     if (chatMode === 'ekarbot-ai') {
       return ekarBotMode === 'inhouse'
-        ? 'https://ekarbotproject.duckdns.org/webhook/ekarbot-ai/inhouse'
+        ? 'https://ekarbotproject.duckdns.org/webhook-test/ekarbot-ai/inhouse'
         : 'https://ekarbotproject.duckdns.org/webhook/ekarbot-ai/external';
     }
 
@@ -497,49 +497,65 @@ const SalesAgentMainPage = ({
         )}
 
         {/* Response Cards */}
-        {n8nResponse?.type === 'single' && n8nResponse.content && showResponse && (
-          <Card className="shadow-xl border-0 bg-gradient-to-r from-blue-50 to-indigo-50 animate-slide-in-up">
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-xl font-bold flex items-center gap-3 text-blue-800">
-                <div className="p-2 bg-blue-200 rounded-full">
-                  <Bot className="h-6 w-6" />
-                </div>
-                EkarBot Response
-              </CardTitle>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={clearResponse}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                <X className="w-4 h-4" />
-              </Button>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {lastPrompt && (
-                <div className="bg-white p-4 rounded-xl border border-blue-200 shadow-sm">
-                  <p className="font-semibold text-gray-700 mb-2">Your Question:</p>
-                  <p className="text-gray-600 italic">"{lastPrompt}"</p>
-                </div>
-              )}
+{n8nResponse?.type === "single" &&
+  n8nResponse.content &&
+  showResponse && (
+    <Card className="shadow-2xl border-0 bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 animate-slide-in-up">
+      {/* Header */}
+      <CardHeader className="flex flex-row items-center justify-between border-b border-indigo-100">
+        <CardTitle className="text-xl font-bold flex items-center gap-3 text-indigo-900">
+          <div className="p-2 bg-indigo-200 rounded-full shadow-md">
+            <Bot className="h-6 w-6 text-indigo-700" />
+          </div>
+          EkarBot Answer
+        </CardTitle>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={clearResponse}
+          className="text-gray-400 hover:text-gray-600 transition"
+        >
+          <X className="w-4 h-4" />
+        </Button>
+      </CardHeader>
 
-              <div className={`bg-white p-6 rounded-xl border border-blue-200 shadow-sm ${isTyping ? 'animate-pulse' : 'animate-fade-in'}`}>
-                <div className="prose max-w-none">
-                  <ul className="list-disc list-inside text-gray-800 text-lg leading-relaxed">
-                    {n8nResponse.content
-                      .split(/\n|\. /) // split by newlines or sentences
-                      .filter(Boolean) // remove empty items
-                      .map((point, idx) => (
-                        <li key={idx} className="mb-2 break-words">
-                          {point.trim()}
-                        </li>
-                      ))}
-                  </ul>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+      {/* Content */}
+      <CardContent className="space-y-6 pt-4">
+        {/* User Question */}
+        {lastPrompt && (
+          <div className="bg-gradient-to-r from-indigo-100 to-blue-100 p-4 rounded-xl border border-indigo-200 shadow-sm">
+            <p className="font-semibold text-indigo-900 mb-2">
+              Your Question:
+            </p>
+            <p className="text-gray-700 italic">“{lastPrompt}”</p>
+          </div>
         )}
+
+        {/* Bot Response */}
+        <div
+          className={`bg-white p-6 rounded-xl border border-indigo-200 shadow-md ${
+            isTyping ? "animate-pulse" : "animate-fade-in"
+          }`}
+        >
+          <div className="prose max-w-none text-gray-800 leading-relaxed text-lg">
+            {n8nResponse.content
+              .split(/\n|\. /) // split into chunks
+              .filter(Boolean)
+              .map((point, idx) => (
+                <div
+                  key={idx}
+                  className="flex items-start gap-3 mb-3 transition hover:translate-x-1"
+                >
+                  <div className="w-2 h-2 mt-2 rounded-full bg-indigo-400 flex-shrink-0" />
+                  <span className="block">{point.trim()}</span>
+                </div>
+              ))}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  )}
+
 
         {/* Multiple Project Suggestions */}
         {!loadingProjects &&

@@ -17,6 +17,7 @@ import { useDropdownOptions } from '@/components/hooks/useDropdownOptions';
 import { validateProjectTitle, validatePhoneNumber, validateEmail, validateFileUpload } from '@/utils/inputValidation';
 import UnitAmenitiesSelector from './UnitAmenitiesSelector';
 import DeveloperNameDropdown from './DeveloperNameDropdown';
+import { AdvancedDatePicker } from '@/components/ui/advanaced-date-picker';
 
 interface Unit {
   id?: string;
@@ -54,9 +55,10 @@ interface UnifiedProjectFormProps {
   handleInputChange: (field: string, value: any) => void;
   handleArrayChange: (field: string, values: string[]) => void;
   editProject?: any;
+  autoFillData?: any;
 }
 
-const UnifiedProjectForm = ({ formData, handleInputChange, handleArrayChange, editProject }: UnifiedProjectFormProps) => {
+const UnifiedProjectForm = ({ formData, handleInputChange, handleArrayChange, editProject, autoFillData }: UnifiedProjectFormProps) => {
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [currentUnits, setCurrentUnits] = useState<Unit[]>(formData.units || []);
@@ -170,7 +172,12 @@ const UnifiedProjectForm = ({ formData, handleInputChange, handleArrayChange, ed
 
   // Separate useEffect to sync currentUnits with formData.units
   useEffect(() => {
-    setCurrentUnits(formData.units || []);
+    // Always sync currentUnits with formData.units when it changes
+    if (formData.units && Array.isArray(formData.units)) {
+      setCurrentUnits(formData.units);
+    } else {
+      setCurrentUnits([]);
+    }
     
     // Populate newUnit form when editing
     if (editProject && formData.units && formData.units.length > 0) {
@@ -238,7 +245,50 @@ const UnifiedProjectForm = ({ formData, handleInputChange, handleArrayChange, ed
         rera_approval_id: formData.rera_approval_id || ''
        });
     }
-  }, [formData.units, editProject, formData.project_title, formData.project_type, formData.project_subtype, formData.listing_type, formData.project_status]);
+  }, [formData.units, editProject]);
+
+  // Additional effect to handle when formData.units changes after localStorage restore
+  useEffect(() => {
+    if (formData.units && formData.units.length > 0 && currentUnits.length === 0) {
+      console.log('Restoring units from formData:', formData.units);
+      setCurrentUnits(formData.units);
+    }
+  }, [formData.units]);
+
+  // Handle autoFill data to populate unit fields
+  useEffect(() => {
+    if (autoFillData) {
+      console.log('Applying autofill data to unit fields:', autoFillData);
+      
+      // Apply autofill data to the newUnit form fields
+      setNewUnit(prev => ({
+        ...prev,
+        // Map autofill data to unit fields
+        project_title: autoFillData.project_title || prev.project_title,
+        developer_name: autoFillData.developer_name || prev.developer_name,
+        description: autoFillData.description || prev.description,
+        project_type: autoFillData.project_type || prev.project_type,
+        project_subtype: autoFillData.project_subtype || prev.project_subtype,
+        listing_type: autoFillData.listing_type || prev.listing_type,
+        project_status: autoFillData.project_status || prev.project_status,
+        starting_price_aed: autoFillData.starting_price_aed || prev.starting_price_aed,
+        price_per_sqft: autoFillData.price_per_sqft || prev.price_per_sqft,
+        service_charges: autoFillData.service_charges || prev.service_charges,
+        payment_plan: autoFillData.payment_plan || prev.payment_plan,
+        handover_date: autoFillData.handover_date || prev.handover_date,
+        rera_approval_id: autoFillData.rera_approval_id || prev.rera_approval_id,
+        ownership_type: autoFillData.ownership_type || prev.ownership_type,
+        furnishing_status: autoFillData.furnishing_status || prev.furnishing_status,
+        unit_size_range: autoFillData.unit_sizes_range || prev.unit_size_range,
+        bedrooms_range: autoFillData.bedrooms_range || prev.bedrooms_range,
+        bathrooms_range: autoFillData.bathrooms_range || prev.bathrooms_range,
+        has_balcony: autoFillData.has_balcony !== undefined ? autoFillData.has_balcony : prev.has_balcony,
+        video_tour_url: autoFillData.video_tour_url || prev.video_tour_url
+      }));
+      
+      console.log('Unit form fields populated with autofill data');
+    }
+  }, [autoFillData]);
 
   const generateUnitCode = () => {
     const prefix = 'UNIT';
@@ -420,44 +470,59 @@ const UnifiedProjectForm = ({ formData, handleInputChange, handleArrayChange, ed
     setUploading(true);
     const uploadedUrls: string[] = [];
 
-    for (const file of Array.from(files)) {
-      const url = await uploadFileToStorage(file, field);
-      if (url) uploadedUrls.push(url);
-    }
+    try {
+      for (const file of Array.from(files)) {
+        const url = await uploadFileToStorage(file, field);
+        if (url) uploadedUrls.push(url);
+      }
 
-    if (uploadedUrls.length === 0) {
+      if (uploadedUrls.length === 0) {
+        toast.error('No files were uploaded successfully');
+        setUploading(false);
+        return;
+      }
+
+      if (unitIndex !== undefined) {
+        // Handle unit-specific media
+        const updatedUnits = [...currentUnits];
+        if (field === 'gallery_images' || field === 'other_documents') {
+          const existing = updatedUnits[unitIndex][field as keyof Unit] as string[] || [];
+          updatedUnits[unitIndex] = {
+            ...updatedUnits[unitIndex],
+            [field]: [...existing, ...uploadedUrls]
+          };
+        } else {
+          updatedUnits[unitIndex] = {
+            ...updatedUnits[unitIndex],
+            [field]: uploadedUrls[0]
+          };
+        }
+        setCurrentUnits(updatedUnits);
+        handleInputChange('units', updatedUnits);
+      } else {
+        // Handle new unit media - ensure arrays are properly initialized
+        if (field === 'gallery_images' || field === 'other_documents') {
+          const existing = Array.isArray(newUnit[field as keyof Unit]) ? newUnit[field as keyof Unit] as string[] : [];
+          const updatedFiles = [...existing, ...uploadedUrls];
+          setNewUnit(prev => ({
+            ...prev,
+            [field]: updatedFiles
+          }));
+        } else {
+          setNewUnit(prev => ({
+            ...prev,
+            [field]: uploadedUrls[0]
+          }));
+        }
+      }
+
+      toast.success(`${uploadedUrls.length} file(s) uploaded successfully`);
+    } catch (error) {
+      console.error('Error uploading files:', error);
+      toast.error('Failed to upload files. Please try again.');
+    } finally {
       setUploading(false);
-      return;
     }
-
-    if (unitIndex !== undefined) {
-      // Handle unit-specific media
-      const updatedUnits = [...currentUnits];
-      if (field === 'gallery_images' || field === 'other_documents') {
-        const existing = updatedUnits[unitIndex][field as keyof Unit] as string[] || [];
-        updatedUnits[unitIndex] = {
-          ...updatedUnits[unitIndex],
-          [field]: [...existing, ...uploadedUrls]
-        };
-      } else {
-        updatedUnits[unitIndex] = {
-          ...updatedUnits[unitIndex],
-          [field]: uploadedUrls[0]
-        };
-      }
-      setCurrentUnits(updatedUnits);
-      handleInputChange('units', updatedUnits);
-    } else {
-      // Handle new unit media
-      if (field === 'gallery_images' || field === 'other_documents') {
-        const existing = newUnit[field as keyof Unit] as string[] || [];
-        handleNewUnitChange(field as keyof Unit, [...existing, ...uploadedUrls]);
-      } else {
-        handleNewUnitChange(field as keyof Unit, uploadedUrls[0]);
-      }
-    }
-
-    setUploading(false);
   };
 
   const removeUnitFile = (field: string, index?: number, unitIndex?: number) => {
@@ -750,30 +815,12 @@ const UnifiedProjectForm = ({ formData, handleInputChange, handleArrayChange, ed
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
               <div>
                 <Label htmlFor="unit_handover_date">Expected Handover Date</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={cn(
-                        "w-full justify-start text-left font-normal",
-                        !newUnit.handover_date && "text-muted-foreground"
-                      )}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {newUnit.handover_date ? format(new Date(newUnit.handover_date), "PPP") : "Select handover date"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0 bg-white" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={newUnit.handover_date ? new Date(newUnit.handover_date) : undefined}
-                      onSelect={(date) => handleNewUnitChange('handover_date', date ? date.toISOString().split('T')[0] : '')}
-                      disabled={(date) => date < today}
-                      initialFocus
-                      className="pointer-events-auto"
-                    />
-                  </PopoverContent>
-                </Popover>
+                <AdvancedDatePicker
+                  value={newUnit.handover_date || ''}
+                  onChange={(date) => handleNewUnitChange('handover_date', date)}
+                  placeholder="Select handover date"
+                  minDate={new Date().toISOString().split('T')[0]}
+                />
               </div>
               <div>
                 <Label htmlFor="unit_rera_approval_id">RERA Approval ID</Label>
@@ -1747,7 +1794,7 @@ const UnifiedProjectForm = ({ formData, handleInputChange, handleArrayChange, ed
                            <p>{unit.has_balcony ? 'Yes' : 'No'}</p>
                         </div>
 
-                        {(formData.amenities && formData.amenities.length > 0) && (
+                        {(Array.isArray(formData.amenities) && formData.amenities.length > 0) && (
                           <div className="mt-3">
                             <span className="font-medium text-gray-600">Amenities:</span>
                             <div className="flex flex-wrap gap-2 mt-1">

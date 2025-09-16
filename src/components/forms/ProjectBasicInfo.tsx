@@ -4,13 +4,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Calendar } from '@/components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Button } from '@/components/ui/button';
-import { CalendarIcon } from 'lucide-react';
-import { format } from 'date-fns';
-import { cn } from '@/lib/utils';
-import { useState } from 'react';
+import { AdvancedDatePicker } from '@/components/ui/advanaced-date-picker';
 import { useDropdownOptions } from '@/components/hooks/useDropdownOptions';
 
 interface ProjectBasicInfoProps {
@@ -19,7 +13,6 @@ interface ProjectBasicInfoProps {
 }
 
 const ProjectBasicInfo = ({ formData, handleInputChange }: ProjectBasicInfoProps) => {
-  const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const { options: projectTypeOptions } = useDropdownOptions('project_type');
   const { options: listingTypeOptions } = useDropdownOptions('listing_type');
   const { options: projectStatusOptions } = useDropdownOptions('project_status');
@@ -35,32 +28,6 @@ const ProjectBasicInfo = ({ formData, handleInputChange }: ProjectBasicInfoProps
       listing_type: formData.listing_type
     }
   });
-
-  const handleDateSelect = (date: Date | undefined) => {
-    if (date) {
-      handleInputChange('handover_date', date.toISOString().split('T')[0]);
-      setIsDatePickerOpen(false);
-    }
-  };
-
-  const getDateFromString = (dateString: string): Date | undefined => {
-    if (!dateString) return undefined;
-    const date = new Date(dateString);
-    // Check if the date is valid
-    if (isNaN(date.getTime())) return undefined;
-    return date;
-  };
-
-  const formatDate = (dateString: string): string => {
-    const date = getDateFromString(dateString);
-    if (!date) return "Select handover date";
-    try {
-      return format(date, "PPP");
-    } catch (error) {
-      console.error("Date formatting error:", error);
-      return "Select handover date";
-    }
-  };
 
   return (
     <Card>
@@ -154,29 +121,12 @@ const ProjectBasicInfo = ({ formData, handleInputChange }: ProjectBasicInfoProps
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <Label htmlFor="handover_date">Expected Handover Date</Label>
-            <Popover open={isDatePickerOpen} onOpenChange={setIsDatePickerOpen}>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className={cn(
-                    "w-full justify-start text-left font-normal",
-                    !formData.handover_date && "text-muted-foreground"
-                  )}
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {formatDate(formData.handover_date || '')}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0 bg-white" align="start">
-                <Calendar
-                  mode="single"
-                  selected={getDateFromString(formData.handover_date)}
-                  onSelect={handleDateSelect}
-                  initialFocus
-                  className="pointer-events-auto"
-                />
-              </PopoverContent>
-            </Popover>
+            <AdvancedDatePicker
+              value={formData.handover_date || ''}
+              onChange={(date) => handleInputChange('handover_date', date)}
+              placeholder="Select handover date"
+              minDate={new Date().toISOString().split('T')[0]}
+            />
           </div>
         </div>
       </CardContent>

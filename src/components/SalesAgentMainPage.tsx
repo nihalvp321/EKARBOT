@@ -106,7 +106,7 @@ const SalesAgentMainPage = ({
 
     if (chatMode === 'ekarbot-ai') {
       return ekarBotMode === 'inhouse'
-        ? 'https://ekarbotproject.duckdns.org/webhook-test/ekarbot-ai/inhouse'
+        ? 'https://ekarbotproject.duckdns.org/webhook/ekarbot-ai/inhouse'
         : 'https://ekarbotproject.duckdns.org/webhook/ekarbot-ai/external';
     }
 

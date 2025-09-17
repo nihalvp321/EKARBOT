@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Eye, EyeOff, Lock, AlertCircle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import ForgotPasswordModal from "@/components/ForgotPasswordModal"; // ensure the path is correct
 
 const DeveloperLoginPage = () => {
   const [developerId, setDeveloperId] = useState("");
@@ -120,11 +121,7 @@ const DeveloperLoginPage = () => {
                     className="absolute right-3 top-1/2 transform -translate-y-1/2 text-[#455560] hover:text-gray-700 transition-colors"
                     disabled={loading}
                   >
-                    {showPassword ? (
-                      <EyeOff className="h-5 w-5" />
-                    ) : (
-                      <Eye className="h-5 w-5" />
-                    )}
+                    {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                   </button>
                 </div>
               </div>
@@ -176,28 +173,32 @@ const DeveloperLoginPage = () => {
           transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
         />
       </motion.div>
+
+      {/* 🔹 Forgot Password Modal */}
+      <ForgotPasswordModal
+        isOpen={showForgotPassword}
+        onClose={() => setShowForgotPassword(false)}
+        userType="developer"
+      />
+
+      {/* Animations injected */}
+      <style>{`
+        @keyframes blob {
+          0% { transform: translate(0, 0) scale(1); }
+          33% { transform: translate(15px, -15px) scale(1.1); }
+          66% { transform: translate(-15px, 15px) scale(1.05); }
+          100% { transform: translate(0, 0) scale(1); }
+        }
+        .animate-blob { animation: blob 15s infinite; }
+        .animate-pulse-slow { animation: pulse 3s infinite; }
+        @keyframes pulse {
+          0%, 100% { transform: scale(1); }
+          50% { transform: scale(1.05); }
+        }
+        .animation-delay-2000 { animation-delay: 2s; }
+      `}</style>
     </div>
   );
 };
-
-// 🔹 Animations injected (same as AuthLoginForm)
-const styles = `
-  @keyframes blob {
-    0% { transform: translate(0, 0) scale(1); }
-    33% { transform: translate(15px, -15px) scale(1.1); }
-    66% { transform: translate(-15px, 15px) scale(1.05); }
-    100% { transform: translate(0, 0) scale(1); }
-  }
-  .animate-blob { animation: blob 15s infinite; }
-  .animate-pulse-slow { animation: pulse 3s infinite; }
-  @keyframes pulse {
-    0%, 100% { transform: scale(1); }
-    50% { transform: scale(1.05); }
-  }
-  .animation-delay-2000 { animation-delay: 2s; }
-`;
-const styleSheet = document.createElement("style");
-styleSheet.textContent = styles;
-document.head.appendChild(styleSheet);
 
 export default DeveloperLoginPage;

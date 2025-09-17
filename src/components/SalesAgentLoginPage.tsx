@@ -4,12 +4,14 @@ import { Input } from '@/components/ui/input';
 import { useSalesAgentAuth } from '@/hooks/useSalesAgentAuth';
 import { Eye, EyeOff, AlertCircle, Shield } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import ForgotPasswordModal from '@/components/ForgotPasswordModal'; // make sure the path is correct
 
 const SalesAgentLoginPage = () => {
   const [formData, setFormData] = useState({ salesAgentId: '', password: '' });
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
   const { signIn } = useSalesAgentAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -130,11 +132,7 @@ const SalesAgentLoginPage = () => {
                     className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-600 hover:text-gray-800 transition-colors"
                     disabled={loading}
                   >
-                    {showPassword ? (
-                      <EyeOff className="h-5 w-5" />
-                    ) : (
-                      <Eye className="h-5 w-5" />
-                    )}
+                    {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                   </button>
                 </div>
               </div>
@@ -161,9 +159,7 @@ const SalesAgentLoginPage = () => {
               <button
                 type="button"
                 className="text-sm text-slate-600 hover:text-gray-800 underline"
-                onClick={() =>
-                  setError('Forgot password feature coming soon. Contact admin.')
-                }
+                onClick={() => setShowForgotPassword(true)}
               >
                 Forgot password?
               </button>
@@ -188,28 +184,32 @@ const SalesAgentLoginPage = () => {
           transition={{ duration: 20, repeat: Infinity, ease: 'linear' }}
         />
       </motion.div>
+
+      {/* 🔹 Forgot Password Modal */}
+      <ForgotPasswordModal
+        isOpen={showForgotPassword}
+        onClose={() => setShowForgotPassword(false)}
+        userType="sales_agent"
+      />
+
+      {/* Animations */}
+      <style>{`
+        @keyframes blob {
+          0% { transform: translate(0, 0) scale(1); }
+          33% { transform: translate(15px, -15px) scale(1.1); }
+          66% { transform: translate(-15px, 15px) scale(1.05); }
+          100% { transform: translate(0, 0) scale(1); }
+        }
+        .animate-blob { animation: blob 15s infinite; }
+        .animate-pulse-slow { animation: pulse 3s infinite; }
+        @keyframes pulse {
+          0%, 100% { transform: scale(1); }
+          50% { transform: scale(1.05); }
+        }
+        .animation-delay-2000 { animation-delay: 2s; }
+      `}</style>
     </div>
   );
 };
-
-// 🔹 Shared Animations
-const styles = `
-  @keyframes blob {
-    0% { transform: translate(0, 0) scale(1); }
-    33% { transform: translate(15px, -15px) scale(1.1); }
-    66% { transform: translate(-15px, 15px) scale(1.05); }
-    100% { transform: translate(0, 0) scale(1); }
-  }
-  .animate-blob { animation: blob 15s infinite; }
-  .animate-pulse-slow { animation: pulse 3s infinite; }
-  @keyframes pulse {
-    0%, 100% { transform: scale(1); }
-    50% { transform: scale(1.05); }
-  }
-  .animation-delay-2000 { animation-delay: 2s; }
-`;
-const styleSheet = document.createElement('style');
-styleSheet.textContent = styles;
-document.head.appendChild(styleSheet);
 
 export default SalesAgentLoginPage;

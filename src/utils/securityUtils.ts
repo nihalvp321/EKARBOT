@@ -1,5 +1,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+import bcrypt from 'bcryptjs';
 
 // Rate limiting utility
 const rateLimitStore = new Map<string, { count: number; windowStart: number }>();
@@ -118,8 +120,9 @@ export const validateSalesAgentCredentials = async (salesAgentId: string, passwo
       return { success: false, error: 'Access denied' };
     }
 
-    // For now, compare password directly (in production, this should use proper hashing)
-    if (appUserData.password_hash !== password) {
+    // Verify password using bcrypt
+    const passwordValid = bcrypt.compareSync(password, appUserData.password_hash);
+    if (!passwordValid) {
       await logSecurityEvent('failed_sales_agent_login', { sales_agent_id: salesAgentId, reason: 'password_mismatch' });
       return { success: false, error: 'Invalid Sales Agent ID or password' };
     }

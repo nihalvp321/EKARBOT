@@ -1,5 +1,6 @@
 import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import bcrypt from 'bcryptjs';
 
 interface DeveloperUser {
   id: string;
@@ -155,9 +156,10 @@ export const DeveloperAuthProvider = ({ children }: { children: ReactNode }) => 
         return { success: false, error: 'Your account has been deactivated by the administrator. Please contact support.' };
       }
 
-      // For demo purposes, compare plain text password
-      if (userData.password_hash !== password.trim()) {
-        console.error('Password mismatch for user:', developerId, 'Expected:', userData.password_hash, 'Got:', password);
+      // Verify password using bcrypt
+      const passwordValid = bcrypt.compareSync(password.trim(), userData.password_hash);
+      if (!passwordValid) {
+        console.error('Password mismatch for developer:', developerId);
         return { success: false, error: 'Invalid developer ID or password' };
       }
 

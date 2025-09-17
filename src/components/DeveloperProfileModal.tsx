@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -9,7 +8,7 @@ import { Camera, Save, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useDeveloperAuth } from '@/hooks/useDeveloperAuth';
-// Removed password change functionality for security
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface DeveloperProfileModalProps {
   open: boolean;
@@ -20,7 +19,6 @@ const DeveloperProfileModal = ({ open, onClose }: DeveloperProfileModalProps) =>
   const { user, profile, refreshProfile } = useDeveloperAuth();
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
-  // Removed password change state for security
   const [formData, setFormData] = useState({
     developer_name: '',
     contact_number: '',
@@ -49,29 +47,22 @@ const DeveloperProfileModal = ({ open, onClose }: DeveloperProfileModalProps) =>
     const file = event.target.files?.[0];
     if (!file || !user || !profile) return;
 
-    // Validate file type
     if (!file.type.startsWith('image/')) {
       toast.error('Please select an image file');
       return;
     }
 
-    // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
       toast.error('Image size should be less than 5MB');
       return;
     }
 
     setUploading(true);
-
     try {
-      // Create a unique filename
       const fileExt = file.name.split('.').pop();
       const fileName = `${user.id}_${Date.now()}.${fileExt}`;
       const filePath = `profiles/${fileName}`;
 
-      console.log('Uploading file to developer-files bucket:', filePath);
-
-      // Upload the file to the developer-files bucket
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('developer-files')
         .upload(filePath, file, {
@@ -84,16 +75,10 @@ const DeveloperProfileModal = ({ open, onClose }: DeveloperProfileModalProps) =>
         throw uploadError;
       }
 
-      console.log('Upload successful:', uploadData);
-
-      // Get the public URL
       const { data: { publicUrl } } = supabase.storage
         .from('developer-files')
         .getPublicUrl(filePath);
 
-      console.log('Public URL:', publicUrl);
-
-      // Update the developer profile with the new image URL
       const { error: updateError } = await supabase
         .from('developers')
         .update({ profile_image_url: publicUrl })
@@ -104,7 +89,6 @@ const DeveloperProfileModal = ({ open, onClose }: DeveloperProfileModalProps) =>
         throw updateError;
       }
 
-      // Refresh the profile data
       await refreshProfile();
       toast.success('Profile image updated successfully');
     } catch (error) {
@@ -120,7 +104,6 @@ const DeveloperProfileModal = ({ open, onClose }: DeveloperProfileModalProps) =>
 
     setUploading(true);
     try {
-      // Update the developer profile to remove the image URL
       const { error: updateError } = await supabase
         .from('developers')
         .update({ profile_image_url: null })
@@ -131,7 +114,6 @@ const DeveloperProfileModal = ({ open, onClose }: DeveloperProfileModalProps) =>
         throw updateError;
       }
 
-      // Refresh the profile data
       await refreshProfile();
       toast.success('Profile image removed successfully');
     } catch (error) {
@@ -176,37 +158,57 @@ const DeveloperProfileModal = ({ open, onClose }: DeveloperProfileModalProps) =>
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-lg p-6 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl shadow-2xl">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            Profile Settings
+          <DialogTitle className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+            <motion.div
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              transition={{ type: 'spring', stiffness: 260, damping: 20 }}
+            >
+              Profile Settings
+            </motion.div>
           </DialogTitle>
         </DialogHeader>
-        
-        <div className="space-y-6">
+
+        <motion.div
+          className="space-y-8"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+        >
           {/* Profile Image Section */}
           <div className="flex flex-col items-center space-y-4">
-            <div className="relative">
-              <Avatar className="h-24 w-24 border-4 border-gray-200">
+            <motion.div
+              className="relative group"
+              whileHover={{ scale: 1.05 }}
+              transition={{ type: 'spring', stiffness: 300 }}
+            >
+              <Avatar className="h-28 w-28 border-4 border-white shadow-lg">
                 <AvatarImage 
                   src={profile?.profile_image_url} 
                   alt={formData.developer_name || user?.username}
+                  className="object-cover"
                 />
                 <AvatarFallback 
                   style={{ backgroundColor: '#455560' }} 
-                  className="text-white text-xl font-semibold"
+                  className="text-white text-2xl font-semibold"
                 >
                   {getInitials(formData.developer_name || user?.username)}
                 </AvatarFallback>
               </Avatar>
               <label 
                 htmlFor="profile-image-upload" 
-                className="absolute bottom-0 right-0 bg-white rounded-full p-2 shadow-lg border-2 border-gray-200 cursor-pointer hover:bg-gray-50 transition-colors"
+                className="absolute bottom-0 right-0 bg-white rounded-full p-2 shadow-lg border-2 border-gray-200 cursor-pointer hover:bg-gray-100 transition-all duration-300"
               >
                 {uploading ? (
-                  <div className="w-4 h-4 border-2 border-gray-600 border-t-transparent rounded-full animate-spin"></div>
+                  <motion.div
+                    animate={{ rotate: 360 }}
+                    transition={{ repeat: Infinity, duration: 1 }}
+                    className="w-5 h-5 border-2 border-gray-600 border-t-transparent rounded-full"
+                  ></motion.div>
                 ) : (
-                  <Camera className="h-4 w-4 text-gray-600" />
+                  <Camera className="h-5 w-5 text-gray-600" />
                 )}
               </label>
               <input
@@ -217,107 +219,92 @@ const DeveloperProfileModal = ({ open, onClose }: DeveloperProfileModalProps) =>
                 className="hidden"
                 disabled={uploading}
               />
-            </div>
-            {uploading && (
-              <p className="text-sm text-gray-500">Uploading image...</p>
-            )}
+            </motion.div>
+            <AnimatePresence>
+              {uploading && (
+                <motion.p
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="text-sm text-gray-500"
+                >
+                  Uploading image...
+                </motion.p>
+              )}
+            </AnimatePresence>
             {profile?.profile_image_url && (
               <Button
                 onClick={handleRemoveImage}
                 variant="outline"
                 size="sm"
                 disabled={uploading}
-                className="text-red-600 hover:text-red-700 border-red-200 hover:border-red-300"
+                className="text-red-600 hover:text-red-700 border-red-200 hover:border-red-300 transition-all duration-300"
               >
                 Remove Image
               </Button>
             )}
           </div>
 
-          {/* Form Fields */}
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="developer_name">Developer Name</Label>
-              <Input
-                id="developer_name"
-                value={formData.developer_name}
-                onChange={(e) => handleInputChange('developer_name', e.target.value)}
-                placeholder="Enter developer name"
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="contact_person_name">Contact Person Name</Label>
-              <Input
-                id="contact_person_name"
-                value={formData.contact_person_name}
-                onChange={(e) => handleInputChange('contact_person_name', e.target.value)}
-                placeholder="Enter contact person name"
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="email_address">Email Address</Label>
-              <Input
-                id="email_address"
-                type="email"
-                value={formData.email_address}
-                onChange={(e) => handleInputChange('email_address', e.target.value)}
-                placeholder="Enter email address"
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="contact_number">Contact Number</Label>
-              <Input
-                id="contact_number"
-                value={formData.contact_number}
-                onChange={(e) => handleInputChange('contact_number', e.target.value)}
-                placeholder="Enter contact number"
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="office_address">Office Address</Label>
-              <Input
-                id="office_address"
-                value={formData.office_address}
-                onChange={(e) => handleInputChange('office_address', e.target.value)}
-                placeholder="Enter office address"
-              />
-            </div>
+          {/* Form Fields in Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {[
+              { id: 'developer_name', label: 'Developer Name', placeholder: 'Enter developer name' },
+              { id: 'contact_person_name', label: 'Contact Person Name', placeholder: 'Enter contact person name' },
+              { id: 'email_address', label: 'Email Address', type: 'email', placeholder: 'Enter email address' },
+              { id: 'contact_number', label: 'Contact Number', placeholder: 'Enter contact number' },
+              { id: 'office_address', label: 'Office Address', placeholder: 'Enter office address' },
+            ].map((field, index) => (
+              <motion.div
+                key={field.id}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.1 * (index + 1) }}
+                className={field.id === 'office_address' ? 'md:col-span-2' : ''}
+              >
+                <Label htmlFor={field.id} className="text-gray-700 font-medium">{field.label}</Label>
+                <Input
+                  id={field.id}
+                  type={field.type || 'text'}
+                  value={formData[field.id as keyof typeof formData]}
+                  onChange={(e) => handleInputChange(field.id, e.target.value)}
+                  placeholder={field.placeholder}
+                  className="mt-1 border-gray-300 focus:border-blue-500 focus:ring-blue-500 transition-all duration-300"
+                />
+              </motion.div>
+            ))}
           </div>
 
           {/* Action Buttons */}
-          <div className="flex gap-2 pt-4">
-            <Button
-              onClick={handleSave}
-              disabled={loading || uploading}
-              style={{ backgroundColor: '#455560' }}
-              className="flex-1 text-white hover:opacity-90"
-            >
-              {loading ? (
-                <>Saving...</>
-              ) : (
-                <>
-                  <Save className="h-4 w-4 mr-2" />
-                  Save Changes
-                </>
-              )}
-            </Button>
-            {/* Password change removed for security */}
-            <Button
-              onClick={onClose}
-              variant="outline"
-              disabled={loading || uploading}
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
+         <motion.div
+  className="flex gap-3 pt-6"
+  initial={{ opacity: 0 }}
+  animate={{ opacity: 1 }}
+  transition={{ delay: 0.5 }}
+>
+  <Button
+    onClick={handleSave}
+    disabled={loading || uploading}
+    className="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700 transition-all duration-300"
+  >
+    {loading ? (
+      <div className="flex items-center justify-center gap-2">
+        <motion.div
+          className="w-4 h-4 border-2 border-white border-t-transparent rounded-full"
+          animate={{ rotate: 360 }}
+          transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
+        />
+        <span>Saving...</span>
+      </div>
+    ) : (
+      <>
+        <Save className="h-4 w-4 mr-2" />
+        <span>Save Changes</span>
+      </>
+    )}
+  </Button>
+</motion.div>
+        </motion.div>
       </DialogContent>
-      
-      {/* Password change modal removed for security */}
     </Dialog>
   );
 };

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Eye, Edit, Trash2, MapPin, Building, DollarSign } from 'lucide-react';
+import { Eye, Edit, Trash2, MapPin, Building, DollarSign, Search } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useDeveloperAuth } from '@/hooks/useDeveloperAuth';
 import { toast } from 'sonner';
@@ -21,11 +21,13 @@ const MyProjects = () => {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
   const { profile } = useDeveloperAuth();
 
   const fetchProjects = async () => {
     if (!profile?.id) return;
 
+    setLoading(true);
     try {
       const { data, error } = await supabase
         .from('projects')
@@ -33,11 +35,7 @@ const MyProjects = () => {
         .eq('developer_id', profile.id)
         .order('created_at', { ascending: false });
 
-      if (error) {
-        console.error('Error fetching projects:', error);
-        toast.error('Failed to fetch projects');
-        return;
-      }
+      if (error) throw error;
 
       setProjects(data || []);
     } catch (error) {
@@ -60,38 +58,30 @@ const MyProjects = () => {
   const confirmDelete = async () => {
     if (!deletingProjectId) return;
 
-    console.log('Attempting to delete project with ID:', deletingProjectId);
-
     try {
-      // First, delete any saved projects that reference this project
       const { error: savedProjectsError } = await supabase
         .from('saved_projects')
         .delete()
         .eq('project_id', deletingProjectId);
 
       if (savedProjectsError) {
-        console.error('Error deleting saved projects:', savedProjectsError);
         toast.error(`Failed to delete related saved projects: ${savedProjectsError.message}`);
         return;
       }
 
-      // Then delete the main project
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('projects')
         .delete()
         .eq('project_id', deletingProjectId);
 
-      console.log('Delete result:', { data, error });
-
       if (error) {
-        console.error('Delete error details:', error);
         toast.error(`Failed to delete project: ${error.message}`);
       } else {
         toast.success('Project deleted successfully');
         fetchProjects();
       }
     } catch (error) {
-      console.error('Delete catch error:', error);
+      console.error(error);
       toast.error('Failed to delete project');
     } finally {
       setShowDeleteModal(false);
@@ -115,7 +105,17 @@ const MyProjects = () => {
     fetchProjects();
   };
 
-if (loading) {
+  const filteredProjects = projects.filter((project) => {
+    const query = searchQuery.toLowerCase();
+    return (
+      project.project_title?.toLowerCase().includes(query) ||
+      project.developer_name?.toLowerCase().includes(query) ||
+      project.city?.toLowerCase().includes(query) ||
+      project.source?.toLowerCase().includes(query)
+    );
+  });
+
+  if (loading) {
   return (
     <div className="flex items-center justify-center min-h-[400px] flex-col space-y-8">
       {/* Morphing blob animation with logo */}
@@ -187,7 +187,7 @@ if (loading) {
       {/* Modern text with shimmer effect */}
       <div className="relative overflow-hidden">
         <div className="text-xl font-medium text-gray-700 bg-gradient-to-r from-gray-700 via-gray-900 to-gray-700 bg-clip-text text-transparent animate-pulse">
-          Loading projects...
+          Loading Projects...
         </div>
         <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer"></div>
       </div>
@@ -201,162 +201,162 @@ if (loading) {
       </div>
     </div>
   );
-}  return (
+}
+
+  return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-gray-900">My Projects</h1>
-        <Badge variant="outline" className="text-sm">
-          Total: {projects.length} projects
-        </Badge>
+      {/* Header + Search */}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <h1 className="text-3xl font-bold text-gray-900">My Projects</h1>
+          <Badge variant="outline" className="text-sm">
+            Total: {projects.length} projects
+          </Badge>
+        </div>
+        <div className="relative w-full md:w-1/3">
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search by title, city, source..."
+            className="pl-10 pr-4 h-12 rounded-xl border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 w-full"
+          />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+        </div>
       </div>
 
-      {projects.length === 0 ? (
+      {filteredProjects.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
             <Building className="h-12 w-12 text-gray-400 mb-4" />
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">No projects yet</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">No projects found</h3>
             <p className="text-gray-600 text-center mb-4">
-              Get started by creating your first project
+              Try adjusting your search or create a new project
             </p>
           </CardContent>
         </Card>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {projects.map((project) => {
+          {filteredProjects.map((project) => {
             const resolvedImageUrl = project.cover_image_url?.startsWith('http')
               ? project.cover_image_url
               : `${supabaseCoverUrl}${project.cover_image_url?.startsWith('/') ? project.cover_image_url.slice(1) : project.cover_image_url}`;
 
             return (
               <Card
-  key={project.project_id}
-  className="relative rounded-2xl overflow-hidden border shadow hover:shadow-lg transition-all duration-300"
->
-  {/* Cover Image */}
-  {project.cover_image_url ? (
-    <img
-      src={resolvedImageUrl}
-      alt={project.project_title}
-      className="w-full h-48 object-cover rounded-t-2xl"
-      onError={(e) => {
-        e.currentTarget.onerror = null;
-        e.currentTarget.src = '/default-cover.jpg';
-      }}
-    />
-  ) : (
-    <div className="w-full h-48 bg-gray-100 flex items-center justify-center rounded-t-2xl">
-      <Building className="h-12 w-12 text-gray-400" />
-    </div>
-  )}
+                key={project.project_id}
+                className="relative rounded-2xl overflow-hidden border shadow hover:shadow-lg transition-all duration-300"
+              >
+                {project.cover_image_url ? (
+                  <img
+                    src={resolvedImageUrl}
+                    alt={project.project_title}
+                    className="w-full h-48 object-cover rounded-t-2xl"
+                    onError={(e) => {
+                      e.currentTarget.onerror = null;
+                      e.currentTarget.src = '/default-cover.jpg';
+                    }}
+                  />
+                ) : (
+                  <div className="w-full h-48 bg-gray-100 flex items-center justify-center rounded-t-2xl">
+                    <Building className="h-12 w-12 text-gray-400" />
+                  </div>
+                )}
 
-  {/* Listing Type & Project Status Badges */}
-  <div className="absolute top-3 left-3 flex flex-wrap items-center gap-2 z-10">
-    {project.listing_type && (
-      <Badge className="text-xs px-2 py-1 bg-blue-600 text-white capitalize shadow">
-        {project.listing_type}
-      </Badge>
-    )}
-    {project.project_status && (
-      <Badge
-        className={`text-xs px-2 py-1 shadow ${
-          project.project_status === 'Ready'
-            ? 'bg-green-600 text-white'
-            : 'bg-yellow-500 text-white'
-        }`}
-      >
-        {project.project_status}
-      </Badge>
-    )}
-  </div>
+                <div className="absolute top-3 left-3 flex flex-wrap items-center gap-2 z-10">
+                  {project.listing_type && (
+                    <Badge className="text-xs px-2 py-1 bg-blue-600 text-white capitalize shadow">
+                      {project.listing_type}
+                    </Badge>
+                  )}
+                  {project.project_status && (
+                    <Badge
+                      className={`text-xs px-2 py-1 shadow ${
+                        project.project_status === 'Ready'
+                          ? 'bg-green-600 text-white'
+                          : 'bg-yellow-500 text-white'
+                      }`}
+                    >
+                      {project.project_status}
+                    </Badge>
+                  )}
+                </div>
 
-  {/* Card Header */}
-  <CardHeader className="p-4 pb-0 space-y-1">
-    <CardTitle className="text-base font-bold text-gray-900 break-words leading-snug">
-      {project.project_title || 'Untitled Project'}
-    </CardTitle>
+                <CardHeader className="p-4 pb-0 space-y-1">
+                  <CardTitle className="text-base font-bold text-gray-900 break-words leading-snug">
+                    {project.project_title || 'Untitled Project'}
+                  </CardTitle>
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-gray-600">
+                    {project.source && (
+                      <Badge className="text-xs px-2 py-1 bg-gray-700 text-white capitalize">
+                        {project.source}
+                      </Badge>
+                    )}
+                    {project.developer_name && <span>| {project.developer_name}</span>}
+                  </div>
+                  <p className="text-sm text-gray-500">{project.project_subtype || 'Not specified'}</p>
+                </CardHeader>
 
-    {/* Source & Developer Name */}
-    <div className="flex flex-wrap items-center gap-2 text-xs text-gray-600">
-      {project.source && (
-        <Badge className="text-xs px-2 py-1 bg-gray-700 text-white capitalize">
-          {project.source}
-        </Badge>
-      )}
-      {project.developer_name && <span>| {project.developer_name}</span>}
-    </div>
+                <CardContent className="p-4 space-y-3">
+                  <div className="flex items-center text-sm text-gray-600">
+                    <MapPin className="h-4 w-4 mr-2" />
+                    <span>
+                      {[project.city, project.emirate, project.region_area].filter(Boolean).join(', ') ||
+                        'Location not specified'}
+                    </span>
+                  </div>
 
-    <p className="text-sm text-gray-500">{project.project_subtype || 'Not specified'}</p>
-  </CardHeader>
+                  {project.starting_price_aed && (
+                    <div className="flex items-center text-sm text-gray-600">
+                      <DollarSign className="h-4 w-4 mr-2" />
+                      <span>AED {project.starting_price_aed.toLocaleString()}</span>
+                    </div>
+                  )}
 
-  {/* Card Body */}
-  <CardContent className="p-4 space-y-3">
-    <div className="flex items-center text-sm text-gray-600">
-      <MapPin className="h-4 w-4 mr-2" />
-      <span>
-        {[project.city, project.emirate, project.region_area]
-          .filter(Boolean)
-          .join(', ') || 'Location not specified'}
-      </span>
-    </div>
+                  <p className="text-sm text-gray-700 line-clamp-2">
+                    {project.description || 'No description available'}
+                  </p>
 
-    {project.starting_price_aed && (
-      <div className="flex items-center text-sm text-gray-600">
-        <DollarSign className="h-4 w-4 mr-2" />
-        <span>AED {project.starting_price_aed.toLocaleString()}</span>
-      </div>
-    )}
+                  {project.url && (
+                    <p className="text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1">
+                      <a href={project.url} target="_blank" rel="noopener noreferrer" className="underline">
+                        Full Details
+                      </a>
+                    </p>
+                  )}
 
-    <p className="text-sm text-gray-700 line-clamp-2">
-      {project.description || 'No description available'}
-    </p>
+                  <div className="flex justify-center gap-2 pt-4">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleView(project)}
+                      className="px-3 py-1.5 text-xs text-blue-600 border-blue-300 hover:bg-blue-50 hover:text-blue-700"
+                    >
+                      <Eye className="h-4 w-4 mr-1" /> View
+                    </Button>
 
-    {project.url && (
-      <p className="text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1">
-        <a href={project.url} target="_blank" rel="noopener noreferrer" className="underline">
-          Full Details
-        </a>
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
-        </svg>
-      </p>
-    )}
+                    {project.source === 'app data' && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleEdit(project)}
+                        className="px-3 py-1.5 text-xs text-green-600 border-green-300 hover:bg-green-50 hover:text-green-700"
+                      >
+                        <Edit className="h-4 w-4 mr-1" /> Edit
+                      </Button>
+                    )}
 
-    {/* Action Buttons */}
-    <div className="flex justify-center gap-2 pt-4">
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() => handleView(project)}
-        className="px-3 py-1.5 text-xs text-blue-600 border-blue-300 hover:bg-blue-50 hover:text-blue-700"
-      >
-        <Eye className="h-4 w-4 mr-1" />
-        View
-      </Button>
-
-      {project.source === 'app data' && (
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => handleEdit(project)}
-          className="px-3 py-1.5 text-xs text-green-600 border-green-300 hover:bg-green-50 hover:text-green-700"
-        >
-          <Edit className="h-4 w-4 mr-1" />
-          Edit
-        </Button>
-      )}
-
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() => handleDelete(project.project_id)}
-        className="px-3 py-1.5 text-xs text-red-600 border-red-300 hover:bg-red-50 hover:text-red-700"
-      >
-        <Trash2 className="h-4 w-4" />
-      </Button>
-    </div>
-  </CardContent>
-</Card>
-
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDelete(project.project_id)}
+                      className="px-3 py-1.5 text-xs text-red-600 border-red-300 hover:bg-red-50 hover:text-red-700"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
             );
           })}
         </div>

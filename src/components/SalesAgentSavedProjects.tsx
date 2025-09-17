@@ -5,12 +5,13 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
-  BookmarkCheck, Building, DollarSign, Eye, MapPin, Heart
+  BookmarkCheck, Building, DollarSign, Eye, MapPin, Heart, Search
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useSalesAgentAuth } from '@/hooks/useSalesAgentAuth';
 import { toast } from 'sonner';
 import ProjectDetailModal from '@/components/ProjectDetailModal';
+import { Input } from '@/components/ui/input';
 
 const SavedProjectsPage = () => {
   const [savedProjects, setSavedProjects] = useState<any[]>([]);
@@ -18,6 +19,7 @@ const SavedProjectsPage = () => {
   const [selectedProject, setSelectedProject] = useState<any>(null);
   const [visibleCount, setVisibleCount] = useState(6);
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const { profile } = useSalesAgentAuth();
 
@@ -69,14 +71,23 @@ const SavedProjectsPage = () => {
     }
   }, [profile]);
 
-  const visibleProjects = savedProjects.slice(0, visibleCount);
+  const filteredProjects = savedProjects.filter(project => {
+    const query = searchQuery.toLowerCase();
+    return (
+      project.project_title?.toLowerCase().includes(query) ||
+      project.developer_name?.toLowerCase().includes(query) ||
+      project.city?.toLowerCase().includes(query)
+    );
+  });
+
+  const visibleProjects = filteredProjects.slice(0, visibleCount);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50">
       {/* Header Section */}
       <div className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 py-6">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
               <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3 animate-fade-in">
                 <Heart className="h-8 w-8 text-pink-500 animate-pulse" />
@@ -85,6 +96,18 @@ const SavedProjectsPage = () => {
               <p className="text-gray-600 mt-2">
                 {savedProjects.length} saved {savedProjects.length === 1 ? 'project' : 'projects'}
               </p>
+            </div>
+
+            {/* Search Bar */}
+            <div className="relative w-full md:w-1/3">
+              <Input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search by title, developer, or city..."
+                className="pl-10 pr-4 h-12 rounded-xl border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+              />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
             </div>
           </div>
         </div>
@@ -97,12 +120,12 @@ const SavedProjectsPage = () => {
               <div key={i} className="animate-pulse rounded-2xl bg-gray-200 h-80"></div>
             ))}
           </div>
-        ) : savedProjects.length === 0 ? (
+        ) : filteredProjects.length === 0 ? (
           <div className="text-center py-20">
             <div className="bg-white rounded-2xl shadow-lg p-12 max-w-md mx-auto animate-fade-in">
               <Heart className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-gray-800 mb-2">No saved projects yet</h3>
-              <p className="text-gray-500">Start exploring and save projects that interest you!</p>
+              <h3 className="text-xl font-semibold text-gray-800 mb-2">No matching projects</h3>
+              <p className="text-gray-500">Try adjusting your search or save more projects!</p>
             </div>
           </div>
         ) : (
@@ -208,7 +231,7 @@ const SavedProjectsPage = () => {
               ))}
             </div>
 
-            {visibleCount < savedProjects.length && (
+            {visibleCount < filteredProjects.length && (
               <div className="text-center mt-12">
                 <Button 
                   onClick={() => setVisibleCount(prev => prev + 6)}

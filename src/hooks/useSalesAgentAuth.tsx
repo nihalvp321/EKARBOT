@@ -1,6 +1,7 @@
 
 import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
 import { validateSalesAgentCredentials, logSecurityEvent } from '@/utils/securityUtils';
+import { supabase } from '@/integrations/supabase/client';
 
 interface SalesAgent {
   id: string;
@@ -70,15 +71,27 @@ export const SalesAgentAuthProvider = ({ children }: { children: ReactNode }) =>
   };
 
   const refreshProfile = async () => {
-    if (!user) return;
+  if (!user) return;
 
-    try {
-      // Refresh profile logic would go here
-      console.log('Profile refresh called for user:', user.id);
-    } catch (error) {
-      console.error('Error refreshing profile:', error);
+  try {
+    const { data, error } = await supabase
+      .from('sales_agents')
+      .select('*')
+      .eq('id', user.id)
+      .single();
+
+    if (!error && data) {
+      setUser(data); // update context state
+      localStorage.setItem('sales_agent_user', JSON.stringify(data)); // persist
+      console.log('Profile refreshed:', data);
+    } else {
+      console.error('Error fetching updated profile:', error);
     }
-  };
+  } catch (err) {
+    console.error('Exception refreshing profile:', err);
+  }
+};
+
 
   const signOut = async () => {
     if (user) {

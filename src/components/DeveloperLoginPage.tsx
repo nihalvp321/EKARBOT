@@ -145,6 +145,7 @@ const DeveloperLoginPage = () => {
 
             {/* Footer */}
             <div className="mt-4 text-center">
+              
               <button
                 type="button"
                 className="text-sm text-[#455560] hover:text-gray-800 underline"
@@ -159,6 +160,7 @@ const DeveloperLoginPage = () => {
               </p>
             </div>
           </div>
+          
         </motion.div>
 
         {/* Background blobs */}

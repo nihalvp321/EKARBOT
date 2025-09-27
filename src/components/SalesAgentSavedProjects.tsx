@@ -4,46 +4,56 @@ import {
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
-  BookmarkCheck, Building, DollarSign, Eye, MapPin, Heart, Search
+  BookmarkX, Building, DollarSign, Eye, MapPin, Search, Grid3X3, List, Filter,
+  BookmarkCheck
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useSalesAgentAuth } from '@/hooks/useSalesAgentAuth';
 import { toast } from 'sonner';
 import ProjectDetailModal from '@/components/ProjectDetailModal';
-import { Input } from '@/components/ui/input';
+import { AnimatePresence, motion } from 'framer-motion';
 
 const SavedProjectsPage = () => {
   const [savedProjects, setSavedProjects] = useState<any[]>([]);
   const [savedProjectIds, setSavedProjectIds] = useState<string[]>([]);
   const [selectedProject, setSelectedProject] = useState<any>(null);
   const [visibleCount, setVisibleCount] = useState(6);
-  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState('date_saved');
+  const [filterBy, setFilterBy] = useState('all');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
   const { profile } = useSalesAgentAuth();
 
   const fetchSavedProjects = async () => {
     if (!profile?.sales_agent_id) return;
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('saved_projects')
-        .select('project_id, projects (*)')
-        .eq('sales_agent_id', profile.sales_agent_id);
 
-      if (error) throw error;
+    const { data, error } = await supabase
+      .from('saved_projects')
+      .select(`
+        project_id, 
+        saved_at,
+        projects (*)
+      `)
+      .eq('sales_agent_id', profile.sales_agent_id)
+      .order('saved_at', { ascending: false });
 
-      const projects = (data || []).map((item: any) => item.projects).filter(Boolean);
-      const ids = (data || []).map((item: any) => item.project_id);
-      setSavedProjects(projects);
-      setSavedProjectIds(ids);
-    } catch (err) {
-      console.error(err);
+    if (error) {
       toast.error('Failed to load saved projects');
-    } finally {
-      setLoading(false);
+      return;
     }
+
+    const projectsWithSaveDate = (data || []).map((item: any) => ({
+      ...item.projects,
+      saved_at: item.saved_at
+    })).filter(Boolean);
+
+    const ids = (data || []).map((item: any) => item.project_id);
+    setSavedProjects(projectsWithSaveDate);
+    setSavedProjectIds(ids);
   };
 
   const handleUnsaveProject = async (projectId: string) => {
@@ -72,178 +82,227 @@ const SavedProjectsPage = () => {
   }, [profile]);
 
   const filteredProjects = savedProjects.filter(project => {
-    const query = searchQuery.toLowerCase();
-    return (
-      project.project_title?.toLowerCase().includes(query) ||
-      project.developer_name?.toLowerCase().includes(query) ||
-      project.city?.toLowerCase().includes(query)
-    );
+    const matchesSearch = !searchQuery ||
+      project.project_title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      project.developer_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      project.city?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      project.community?.toLowerCase().includes(searchQuery.toLowerCase());
+
+    const matchesFilter = filterBy === 'all' ||
+      project.project_type?.toLowerCase() === filterBy ||
+      project.project_subtype?.toLowerCase() === filterBy ||
+      project.project_status?.toLowerCase() === filterBy ||
+      (filterBy === 'rent' 
+        ? (project.listing_type?.toLowerCase() === 'rent' || project.listing_type?.toLowerCase() === 'yearly')
+        : project.listing_type?.toLowerCase() === filterBy);
+
+    return matchesSearch && matchesFilter;
   });
 
-  const visibleProjects = filteredProjects.slice(0, visibleCount);
+  const sortedProjects = [...filteredProjects].sort((a, b) => {
+    switch (sortBy) {
+      case 'date_saved':
+        return new Date(b.saved_at).getTime() - new Date(a.saved_at).getTime();
+      case 'price_low':
+        return (a.starting_price_aed || 0) - (b.starting_price_aed || 0);
+      case 'price_high':
+        return (b.starting_price_aed || 0) - (a.starting_price_aed || 0);
+      case 'name':
+        return (a.project_title || '').localeCompare(b.project_title || '');
+      case 'location':
+        return (a.city || '').localeCompare(b.city || '');
+      default:
+        return 0;
+    }
+  });
+
+  const visibleProjects = sortedProjects.slice(0, visibleCount);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50">
-      {/* Header Section */}
-      <div className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 py-6">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3 animate-fade-in">
-                <Heart className="h-8 w-8 text-pink-500 animate-pulse" />
-                Your Saved Projects
-              </h1>
-              <p className="text-gray-600 mt-2">
-                {savedProjects.length} saved {savedProjects.length === 1 ? 'project' : 'projects'}
-              </p>
-            </div>
+     <AnimatePresence>
+  <motion.div
+    initial={{ opacity: 0, y: 20 }}
+    animate={{ opacity: 1, y: 0 }}
+    exit={{ opacity: 0, y: 20 }}
+    transition={{ duration: 0.5 }}
+    className="max-w-[1300px] mx-auto px-4 md:px-6 pb-10 space-y-4"
+  >
+      {/* Page Header */}
+      <div className="space-y-4">
+        <div className="flex flex-col items-start gap-2 border-b border-slate-200 pb-3">
+          <br></br><h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-slate-800">
+            Saved Projects
+          </h1>
+          <Badge
+            variant="secondary"
+            className="rounded-full px-3 py-1 text-xs md:text-sm font-medium bg-slate-100 text-slate-700"
+          >
+            {savedProjects.length} {savedProjects.length === 1 ? 'Project' : 'Projects'}
+          </Badge>
+        </div>
 
-            {/* Search Bar */}
-            <div className="relative w-full md:w-1/3">
-              <Input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search by title, developer, or city..."
-                className="pl-10 pr-4 h-12 rounded-xl border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-              />
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+        {/* Search & Filters */}
+        <div className="flex flex-col md:flex-row gap-3 md:items-center">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search projects..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10 text-sm md:text-base"
+            />
+          </div>
+          <div className="flex gap-2 flex-wrap items-center">
+            <Select value={filterBy} onValueChange={setFilterBy}>
+              <SelectTrigger className="w-[130px] text-xs md:text-sm">
+                <Filter className="h-3 w-3 mr-1" />
+                <SelectValue placeholder="Filter" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Types</SelectItem>
+                <SelectItem value="villa">Villa</SelectItem>
+                <SelectItem value="apartment">Apartment</SelectItem>
+                <SelectItem value="townhouse">Townhouse</SelectItem>
+                <SelectItem value="ready">Ready</SelectItem>
+                <SelectItem value="off-plan">Off-plan</SelectItem>
+                <SelectItem value="sale">Sale</SelectItem>
+                <SelectItem value="rent">Rent</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={sortBy} onValueChange={setSortBy}>
+              <SelectTrigger className="w-[130px] text-xs md:text-sm">
+                <SelectValue placeholder="Sort by" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="date_saved">Date Saved</SelectItem>
+                <SelectItem value="name">Name A-Z</SelectItem>
+                <SelectItem value="location">Location</SelectItem>
+                <SelectItem value="price_low">Price: Low to High</SelectItem>
+                <SelectItem value="price_high">Price: High to Low</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* View Toggle */}
+            <div className="flex border rounded-md overflow-hidden">
+              <Button
+                variant={viewMode === 'grid' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setViewMode('grid')}
+                className="rounded-none px-2"
+              >
+                <Grid3X3 className="h-4 w-4" />
+              </Button>
+              <Button
+                variant={viewMode === 'list' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setViewMode('list')}
+                className="rounded-none px-2"
+              >
+                <List className="h-4 w-4" />
+              </Button>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        {loading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="animate-pulse rounded-2xl bg-gray-200 h-80"></div>
-            ))}
-          </div>
-        ) : filteredProjects.length === 0 ? (
-          <div className="text-center py-20">
-            <div className="bg-white rounded-2xl shadow-lg p-12 max-w-md mx-auto animate-fade-in">
-              <Heart className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-gray-800 mb-2">No matching projects</h3>
-              <p className="text-gray-500">Try adjusting your search or save more projects!</p>
+      {/* Results */}
+      {savedProjects.length === 0 ? (
+        <Card className="text-center py-10 shadow-sm rounded-lg">
+          <CardContent className="space-y-3">
+            <BookmarkX className="h-12 w-12 mx-auto text-muted-foreground" />
+            <div>
+              <h3 className="text-base font-medium">No saved projects yet</h3>
+              <p className="text-sm text-muted-foreground">Start saving projects to easily access them later.</p>
             </div>
-          </div>
-        ) : (
-          <>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {visibleProjects.map((project, index) => (
-                <Card
+            <Button size="sm" className="mt-3">Browse Projects</Button>
+          </CardContent>
+        </Card>
+      ) : filteredProjects.length === 0 ? (
+        <Card className="text-center py-8 shadow-sm rounded-lg">
+          <CardContent>
+            <Search className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
+            <h3 className="text-base font-medium mb-1">No projects found</h3>
+            <p className="text-sm text-muted-foreground">Try adjusting your search or filters</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <>
+          <AnimatePresence>
+            <div className={viewMode === 'grid' ? 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4' : 'flex flex-col gap-3'}>
+              {visibleProjects.map((project) => (
+                <motion.div
                   key={project.project_id}
-                  className="relative border-0 rounded-2xl overflow-hidden shadow-xl bg-white hover:shadow-2xl transform transition-all duration-500 hover:scale-105 animate-fade-in-up"
-                  style={{ animationDelay: `${index * 100}ms` }}
+                  layout
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  transition={{ duration: 0.2 }}
                 >
-                  <div className="absolute top-4 left-4 flex flex-wrap items-center gap-2 z-10">
-                    {project.listing_type && (
-                      <Badge className="text-xs px-3 py-1 bg-gradient-to-r from-blue-500 to-blue-600 text-white capitalize shadow-lg rounded-full">
-                        {project.listing_type}
-                      </Badge>
-                    )}
-                    {project.project_status && (
-                      <Badge
-                        className={`text-xs px-3 py-1 shadow-lg rounded-full ${
-                          project.project_status === 'Ready'
-                            ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white'
-                            : 'bg-gradient-to-r from-yellow-500 to-orange-500 text-white'
-                        }`}
-                      >
-                        {project.project_status}
-                      </Badge>
-                    )}
-                  </div>
-
-                  {project.cover_image_url ? (
-                    <div className="relative overflow-hidden">
-                      <img
-                        src={project.cover_image_url}
-                        alt={project.project_title}
-                        className="w-full h-52 object-cover transition-transform duration-500 hover:scale-110"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent"></div>
-                    </div>
-                  ) : (
-                    <div className="w-full h-52 flex items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200">
-                      <Building className="h-16 w-16 text-gray-400" />
-                    </div>
-                  )}
-
-                  <CardHeader className="p-5 pb-3">
-                    <CardTitle className="text-lg font-bold text-gray-800 line-clamp-2">
-                      {project.project_title}
-                    </CardTitle>
-                    <p className="text-purple-600 font-semibold">{project.developer_name}</p>
-                    <div className="flex items-center gap-2 mt-2">
-                      <Badge className="text-xs px-3 py-1 bg-gradient-to-r from-gray-600 to-gray-700 text-white capitalize rounded-full">
-                        {project.source}
-                      </Badge>
-                      <Badge variant="outline" className="text-xs px-3 py-1 border-gray-300 text-gray-600 rounded-full">
-                        {project.project_type}
-                      </Badge>
-                    </div>
-                  </CardHeader>
-
-                  <CardContent className="space-y-3 text-sm text-gray-700 px-5 pb-5">
-                    <div className="flex items-center gap-2 text-gray-600">
-                      <MapPin className="h-4 w-4 text-red-500" />
-                      <span className="font-medium">{project.city || 'Unknown Location'}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-gray-600">
-                      <DollarSign className="h-4 w-4 text-green-500" />
-                      <span className="font-bold text-green-600">
-                        AED {project.starting_price_aed?.toLocaleString() || 'Price on request'}
-                      </span>
+                  <Card className={`relative rounded-lg overflow-hidden shadow-md hover:shadow-lg transition-all duration-300 flex ${viewMode === 'list' ? 'flex-col sm:flex-row' : 'flex-col'}`}>
+                    {/* Image */}
+                    <div className={`relative ${viewMode === 'list' ? 'w-full sm:w-1/3 h-48 sm:h-auto' : 'w-full h-48'}`}>
+                      {project.cover_image_url ? (
+                        <img
+                          src={project.cover_image_url}
+                          alt={project.project_title || 'Unspecified'}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-muted">
+                          <Building className="h-8 w-8 text-muted-foreground" />
+                        </div>
+                      )}
+                      <div className="absolute top-2 left-2 flex gap-1 flex-wrap">
+                        <Badge variant="secondary" className="text-xs px-1.5 py-0.5 capitalize shadow">{project.listing_type || 'Unspecified'}</Badge>
+                        <Badge variant={project.project_status === 'Ready' ? 'default' : 'secondary'} className="text-xs px-1.5 py-0.5 shadow">{project.project_status || 'Unspecified'}</Badge>
+                      </div>
                     </div>
 
-                    <div className="flex gap-2 pt-3 items-center">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setSelectedProject(project)}
-                        className="flex-1 border-gray-300 text-gray-700 hover:bg-blue-50 hover:border-blue-300 rounded-xl transition-all duration-300"
-                      >
-                        <Eye className="h-4 w-4 mr-2" /> 
-                        Details
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleUnsaveProject(project.project_id)}
-                        className="rounded-xl transition-all duration-300 transform hover:scale-110 text-pink-600 bg-pink-50 hover:bg-pink-100"
-                      >
-                        <BookmarkCheck className="h-5 w-5" />
-                      </Button>
-                    </div>
+                    {/* Info */}
+                    <div className="flex-1 flex flex-col justify-between p-3 space-y-2">
+                      <div>
+                        <h3 className="font-semibold text-sm md:text-base text-slate-800 truncate">{project.project_title || 'Unspecified'}</h3>
+                        <p className="text-xs md:text-sm text-muted-foreground">{project.developer_name || 'Unspecified'}</p>
+                        <div className="flex flex-wrap gap-2 mt-1 text-xs md:text-sm text-gray-600">
+                          <span className="flex items-center gap-1"><MapPin className="h-3 w-3 text-red-500" />{project.city || 'Unspecified'}</span>
+                          <span className="flex items-center gap-1"><DollarSign className="h-3 w-3 text-green-500" />{project.starting_price_aed ? `AED ${project.starting_price_aed.toLocaleString()}` : 'Unspecified'}</span>
+                          <span>{project.bedrooms_range ? `${project.bedrooms_range} ${parseInt(project.bedrooms_range) > 1 ? 'bedrooms' : 'bedroom'}` : 'Unspecified'}</span>
+                          <span>{project.bathrooms_range ? `${project.bathrooms_range} ${parseInt(project.bathrooms_range) > 1 ? 'bathrooms' : 'bathroom'}` : 'Unspecified'}</span>
+                          <Badge variant="outline" className="px-2 py-0.5 text-xs">{project.project_subtype || 'Unspecified'}</Badge>
+                        </div>
+                      </div>
 
-                    <a
-                      href={project.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-xs text-blue-600 hover:text-blue-800 underline transition-colors duration-200 block"
-                    >
-                      View Original Listing ↗
-                    </a>
-                  </CardContent>
-                </Card>
+                      {/* Actions */}
+                      <div className="flex gap-2 mt-2">
+                        <Button variant="outline" size="sm" className="text-xs flex-1" onClick={() => setSelectedProject(project)}>
+                          <Eye className="h-3 w-3 mr-1" /> View
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => handleUnsaveProject(project.project_id)} className="hover:text-destructive">
+                          <BookmarkCheck className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </Card>
+                </motion.div>
               ))}
             </div>
+          </AnimatePresence>
 
-            {visibleCount < filteredProjects.length && (
-              <div className="text-center mt-12">
-                <Button 
-                  onClick={() => setVisibleCount(prev => prev + 6)}
-                  className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white px-8 py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transform transition-all duration-300 hover:scale-105"
-                >
-                  Load More Projects
-                </Button>
-              </div>
-            )}
-          </>
-        )}
-      </div>
+          {visibleCount < sortedProjects.length && (
+            <div className="text-center mt-4">
+              <Button size="sm" onClick={() => setVisibleCount(prev => prev + 6)} className="text-xs">
+                View More ({sortedProjects.length - visibleCount} remaining)
+              </Button>
+            </div>
+          )}
+
+          <div className="text-center text-xs md:text-sm text-muted-foreground">
+            Showing {visibleProjects.length} of {sortedProjects.length} projects
+            {searchQuery && ` matching "${searchQuery}"`}
+          </div>
+        </>
+      )}
 
       {selectedProject && (
         <ProjectDetailModal
@@ -252,7 +311,8 @@ const SavedProjectsPage = () => {
           project={selectedProject}
         />
       )}
-    </div>
+    </motion.div>
+  </AnimatePresence>
   );
 };
 

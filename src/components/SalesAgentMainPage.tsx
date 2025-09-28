@@ -619,10 +619,10 @@ const formatMessageContent = (content: string) => {
                       const [, key, value] = kvMatch;
                       return (
                         <div key={detailIndex} className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-2">
-                          <span className="font-bold text-xs sm:text-sm text-gray-700 min-w-24">
+                          <span className="font-bold text-sm sm:text-base text-gray-700 min-w-24">
                             {parseBoldText(key.trim())}:
                           </span>
-                          <span className="text-xs sm:text-sm text-gray-600 flex-1">
+                          <span className="text-sm sm:text-base text-gray-600 flex-1">
                             {parseBoldText(value.trim())}
                           </span>
                         </div>
@@ -630,8 +630,8 @@ const formatMessageContent = (content: string) => {
                     } else {
                       return (
                         <div key={detailIndex} className="flex items-start gap-2">
-                          <span className="text-blue-500 text-xs mt-1">•</span>
-                          <span className="text-xs sm:text-sm text-gray-600 flex-1">
+                          <span className="text-blue-500 text-sm mt-1">•</span>
+                          <span className="text-sm sm:text-base text-gray-600 flex-1">
                             {parseBoldText(cleanDetail)}
                           </span>
                         </div>
@@ -653,7 +653,7 @@ const formatMessageContent = (content: string) => {
   
   if (simpleLines.length > 1) {
     return (
-      <div className="text-xs sm:text-sm leading-relaxed space-y-2">
+      <div className="text-sm sm:text-base leading-relaxed space-y-2">
         {simpleLines.map((line, index) => (
           <p key={index}>{parseBoldText(line.trim())}</p>
         ))}
@@ -662,7 +662,7 @@ const formatMessageContent = (content: string) => {
   }
   
   return (
-    <div className="text-xs sm:text-sm leading-relaxed">
+    <div className="text-sm sm:text-base leading-relaxed">
       {parseBoldText(normalizedContent)}
     </div>
   );
@@ -683,9 +683,9 @@ const formatMessageContent = (content: string) => {
   }, []);
 
   return (
-    <div className="h-screen flex flex-col bg-gray-50">
-      <div className="flex-1 flex flex-col pb-28 sm:pb-32">
-        <div ref={chatContainerRef} className="flex-1 overflow-y-auto p-4 sm:p-6">
+    <div className="min-h-screen flex flex-col bg-gray-50">
+      <div className="flex-1 flex flex-col pb-32 sm:pb-36">
+        <div ref={chatContainerRef} className="flex-1 overflow-y-auto p-3 sm:p-4">
           {currentSessionId ? (
             <div className="max-w-7xl mx-auto space-y-4 sm:space-y-6">
               {chatHistory.map((message) => (
@@ -703,23 +703,23 @@ const formatMessageContent = (content: string) => {
                       >
                         <div className="flex items-start gap-2 sm:gap-3">
                           {message.message_type === 'bot' && (
-                            <div className="shrink-0 w-6 h-6 sm:w-8 sm:h-8 bg-gray-100 rounded-full flex items-center justify-center">
+                            <div className="shrink-0 w-8 h-8 sm:w-10 sm:h-10 bg-gray-100 rounded-full flex items-center justify-center">
                               <img 
                                 src="/lovable-uploads/00baa288-f375-4798-aa52-0272029ed647.png" 
                                 alt="EkarBot" 
-                                className="w-4 h-4 sm:w-5 sm:h-5"
+                                className="w-5 h-5 sm:w-6 sm:h-6"
                               />
                             </div>
                           )}
                           <div className="flex-1">
                             {message.message_type === 'user' ? (
-                              <p className="text-xs sm:text-sm leading-relaxed text-white">
+                              <p className="text-sm sm:text-base leading-relaxed text-white">
                                 {message.message_content}
                               </p>
                             ) : (
                               formatMessageContent(message.message_content)
                             )}
-                            <p className={`text-[10px] sm:text-xs mt-1 sm:mt-2 ${
+                            <p className={`text-xs sm:text-sm mt-1 sm:mt-2 ${
                               message.message_type === 'user' ? 'text-blue-100' : 'text-gray-500'
                             }`}>
                               {formatTime(message.created_at)}
@@ -748,7 +748,7 @@ const formatMessageContent = (content: string) => {
                       return (
                         <div className="mt-4 sm:mt-6">
                           <div className="mb-2 sm:mb-4 text-center">
-                            <Badge className="bg-[#455560] text-white px-3 sm:px-4 py-1 sm:py-2 text-xs sm:text-sm">
+                            <Badge className="bg-[#455560] text-white px-3 sm:px-4 py-1 sm:py-2 text-sm sm:text-base">
                               {localSortedProjects.length === 1
                                 ? "🏠 Here is the 1 property as you requested"
                                 : `🏠 Here are the ${localSortedProjects.length} properties as you requested`}
@@ -762,8 +762,8 @@ const formatMessageContent = (content: string) => {
                                   key={project.project_id}
                                   className="group relative border-0 rounded-xl sm:rounded-2xl overflow-hidden shadow-md sm:shadow-lg bg-white hover:shadow-xl sm:hover:shadow-2xl transform transition-all duration-500 hover:scale-102 sm:hover:scale-105"
                                 >
-                                  <div className="absolute top-2 sm:top-4 right-2 sm:right-4 z-10">
-                                    <Badge className="bg-gradient-to-r from-green-500 to-emerald-500 text-white font-bold px-2 sm:px-3 py-0.5 sm:py-1 text-[10px] sm:text-xs rounded-full shadow-md sm:shadow-lg">
+                                  <div className="absolute top-3 sm:top-4 right-3 sm:right-4 z-10">
+                                    <Badge className="bg-gradient-to-r from-green-500 to-emerald-500 text-white font-bold px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm rounded-full shadow-md sm:shadow-lg">
                                       {project.match?.similarity_percentage}% match
                                     </Badge>
                                   </div>
@@ -772,54 +772,54 @@ const formatMessageContent = (content: string) => {
                                     <img
                                       src={project.cover_image_url}
                                       alt={project.project_title}
-                                      className="w-full h-40 sm:h-48 object-cover transition-transform duration-700 group-hover:scale-110"
+                                      className="w-full h-48 sm:h-56 object-cover transition-transform duration-700 group-hover:scale-110"
                                     />
                                     <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent"></div>
                                   </div>
 
-                                  <CardHeader className="p-3 sm:p-5 pb-2 sm:pb-3">
+                                  <CardHeader className="p-4 sm:p-5 pb-2 sm:pb-3">
                                     <CardTitle className="text-base sm:text-lg font-bold text-gray-800 line-clamp-2">
                                       {project.project_title}
                                     </CardTitle>
-                                    <p className="text-purple-600 font-semibold text-xs sm:text-sm">{project.developer_name}</p>
-                                    <div className="flex items-center gap-1 sm:gap-2 mt-1 sm:mt-2">
-                                      <Badge className="text-[10px] sm:text-xs px-2 sm:px-3 py-0.5 sm:py-1 bg-gradient-to-r from-gray-600 to-gray-700 text-white capitalize rounded-full">
+                                    <p className="text-purple-600 font-semibold text-sm sm:text-base">{project.developer_name}</p>
+                                    <div className="flex items-center gap-2 sm:gap-3 mt-1 sm:mt-2">
+                                      <Badge className="text-xs sm:text-sm px-2 sm:px-3 py-1 sm:py-1.5 bg-gradient-to-r from-gray-600 to-gray-700 text-white capitalize rounded-full">
                                         {project.source}
                                       </Badge>
-                                      <Badge variant="outline" className="text-[10px] sm:text-xs px-2 sm:px-3 py-0.5 sm:py-1 border-gray-300 text-gray-600 rounded-full">
+                                      <Badge variant="outline" className="text-xs sm:text-sm px-2 sm:px-3 py-1 sm:py-1.5 border-gray-300 text-gray-600 rounded-full">
                                         {project.project_subtype}
                                       </Badge>
                                     </div>
                                   </CardHeader>
 
-                                  <CardContent className="space-y-2 sm:space-y-3 text-xs sm:text-sm text-gray-700 px-3 sm:px-5 pb-3 sm:pb-5">
-                                    <div className="flex items-center gap-1 sm:gap-2 text-gray-600">
-                                      <MapPin className="h-3 w-3 sm:h-4 sm:w-4 text-red-500" />
-                                      <span className="font-medium text-xs sm:text-sm">{project.emirate || 'Unknown Location'}</span>
+                                  <CardContent className="space-y-2 sm:space-y-3 text-sm sm:text-base text-gray-700 px-4 sm:px-5 pb-4 sm:pb-5">
+                                    <div className="flex items-center gap-2 sm:gap-3 text-gray-600">
+                                      <MapPin className="h-4 w-4 sm:h-5 sm:w-5 text-red-500" />
+                                      <span className="font-medium text-sm sm:text-base">{project.emirate || 'Unknown Location'}</span>
                                     </div>
-                                    <div className="flex items-center gap-1 sm:gap-2 text-gray-600">
-                                      <DollarSign className="h-3 w-3 sm:h-4 sm:w-4 text-green-500" />
-                                      <span className="font-bold text-xs sm:text-sm text-green-600">
+                                    <div className="flex items-center gap-2 sm:gap-3 text-gray-600">
+                                      <DollarSign className="h-4 w-4 sm:h-5 sm:w-5 text-green-500" />
+                                      <span className="font-bold text-sm sm:text-base text-green-600">
                                         AED {project.starting_price_aed?.toLocaleString() || 'Price on request'}
                                       </span>
                                     </div>
 
                                     {project.match?.content && (
-                                      <div className="bg-blue-50 p-2 sm:p-3 rounded-lg border border-blue-100">
-                                        <p className="text-[10px] sm:text-xs text-blue-800 line-clamp-2">
+                                      <div className="bg-blue-50 p-3 sm:p-4 rounded-lg border border-blue-100">
+                                        <p className="text-xs sm:text-sm text-blue-800 line-clamp-2">
                                           {project.match.content}
                                         </p>
                                       </div>
                                     )}
 
-                                    <div className="flex gap-1 sm:gap-2 pt-2 sm:pt-3 items-center">
+                                    <div className="flex gap-2 sm:gap-3 pt-3 sm:pt-4 items-center">
                                       <Button
                                         variant="outline"
                                         size="sm"
                                         onClick={() => setSelectedProject(project)}
-                                        className="flex-1 border-gray-300 text-gray-700 hover:bg-blue-50 hover:border-blue-300 rounded-lg sm:rounded-xl text-xs sm:text-sm transition-all duration-300"
+                                        className="flex-1 border-gray-300 text-gray-700 hover:bg-blue-50 hover:border-blue-300 rounded-lg sm:rounded-xl text-sm sm:text-base transition-all duration-300"
                                       >
-                                        <Eye className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" /> 
+                                        <Eye className="h-4 w-4 sm:h-5 sm:w-5 mr-2 sm:mr-3" /> 
                                         Details
                                       </Button>
                                       <Button
@@ -830,7 +830,7 @@ const formatMessageContent = (content: string) => {
                                           isSaved ? 'text-pink-600 bg-pink-50' : 'text-gray-400 hover:text-pink-600 hover:bg-pink-50'
                                         }`}
                                       >
-                                        {isSaved ? <BookmarkCheck className="h-4 w-4 sm:h-5 sm:w-5" /> : <Bookmark className="h-4 w-4 sm:h-5 sm:w-5" />}
+                                        {isSaved ? <BookmarkCheck className="h-5 w-5 sm:h-6 sm:w-6" /> : <Bookmark className="h-5 w-5 sm:h-6 sm:w-6" />}
                                       </Button>
                                     </div>
 
@@ -838,7 +838,7 @@ const formatMessageContent = (content: string) => {
                                       href={project.url}
                                       target="_blank"
                                       rel="noopener noreferrer"
-                                      className="text-[10px] sm:text-xs text-blue-600 hover:text-blue-800 underline transition-colors duration-200 block"
+                                      className="text-xs sm:text-sm text-blue-600 hover:text-blue-800 underline transition-colors duration-200 block"
                                     >
                                       View Original Listing ↗
                                     </a>
@@ -856,19 +856,19 @@ const formatMessageContent = (content: string) => {
 
               {isSending && (
                 <div className="flex justify-start">
-                  <div className="bg-white border border-gray-200 shadow-sm rounded-xl sm:rounded-2xl px-4 sm:px-6 py-2 sm:py-4">
-                    <div className="flex items-center gap-2 sm:gap-3">
-                      <div className="w-6 h-6 sm:w-8 sm:h-8 bg-gray-100 rounded-full flex items-center justify-center">
+                  <div className="bg-white border border-gray-200 shadow-sm rounded-xl sm:rounded-2xl px-4 sm:px-6 py-3 sm:py-4">
+                    <div className="flex items-center gap-3 sm:gap-4">
+                      <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gray-100 rounded-full flex items-center justify-center">
                          <img 
                               src="/lovable-uploads/00baa288-f375-4798-aa52-0272029ed647.png" 
                               alt="EkarBot" 
-                              className="w-4 h-4 sm:w-5 sm:h-5"
+                              className="w-5 h-5 sm:w-6 sm:h-6"
                             />
                       </div>
-                      <div className="flex gap-1">
-                        <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                        <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                        <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                      <div className="flex gap-2">
+                        <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 bg-gray-400 rounded-full animate-bounce"></div>
+                        <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                        <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
                       </div>
                     </div>
                   </div>
@@ -879,11 +879,11 @@ const formatMessageContent = (content: string) => {
           ) : (
             <div className="flex-1 flex items-center justify-center">
               <div className="text-center">
-                <Bot className="w-12 h-12 sm:w-16 sm:h-16 text-gray-300 mx-auto mb-2 sm:mb-4" />
-                <h2 className="text-lg sm:text-xl font-semibold text-gray-600 mb-2 sm:mb-4">Welcome to EkarBot</h2>
-                <p className="text-xs sm:text-sm text-gray-500 mb-4 sm:mb-6">Create a new chat to get started</p>
-                <Button onClick={createNewChatSession} className="bg-[#455560] text-white text-xs sm:text-sm">
-                  <Plus className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+                <Bot className="w-16 h-16 sm:w-20 sm:h-20 text-gray-300 mx-auto mb-3 sm:mb-4" />
+                <h2 className="text-xl sm:text-2xl font-semibold text-gray-600 mb-3 sm:mb-4">Welcome to EkarBot</h2>
+                <p className="text-sm sm:text-base text-gray-500 mb-4 sm:mb-6">Create a new chat to get started</p>
+                <Button onClick={createNewChatSession} className="bg-[#455560] text-white text-sm sm:text-base py-2 sm:py-3 px-4 sm:px-6">
+                  <Plus className="w-4 h-4 sm:w-5 sm:h-5 mr-2 sm:mr-3" />
                   Start New Chat
                 </Button>
               </div>
@@ -893,14 +893,14 @@ const formatMessageContent = (content: string) => {
 
         {showScrollDown && (
           <Button
-            className="fixed bottom-24 left-4 z-20 bg-white shadow-lg rounded-full p-2"
+            className="fixed bottom-28 sm:bottom-32 left-4 z-20 bg-white shadow-lg rounded-full p-3 sm:p-4"
             onClick={scrollToBottom}
           >
-            <ArrowDown className="h-6 w-6" />
+            <ArrowDown className="h-6 w-6 sm:h-8 sm:w-8" />
           </Button>
         )}
 
-        <div className={`fixed bottom-0 left-0 right-0 bg-gray-50 supports-[backdrop-filter]:bg-background/60 backdrop-blur p-2 sm:p-4 z-10 transition-all duration-300 ease-in-out ${isCollapsed ? 'lg:pl-16' : 'lg:pl-64'}`}>
+        <div className={`fixed bottom-0 left-0 right-0 bg-gray-50 supports-[backdrop-filter]:bg-background/60 backdrop-blur p-3 sm:p-4 z-20 transition-all duration-300 ease-in-out ${isCollapsed ? 'lg:pl-16' : 'lg:pl-64'}`}>
           {currentSessionId && (
             <div className="max-w-4xl mx-auto">
               <div className="flex items-center gap-2 sm:gap-3">
@@ -917,10 +917,10 @@ const formatMessageContent = (content: string) => {
                         damping: 20,
                       }}
                       ref={dropdownRef}
-                      className="absolute bottom-20 sm:bottom-[105px] left-[320px] -translate-x-1/2 w-64 sm:w-72 bg-white rounded-lg sm:rounded-xl shadow-xl sm:shadow-2xl border border-gray-200 z-50"
+                      className="absolute bottom-20 sm:bottom-24 left-100 -translate-x-1/2 w-[70vw] sm:w-80 bg-white rounded-lg sm:rounded-xl shadow-xl sm:shadow-2xl border border-gray-200 z-50"
                     >
-                      <div className="p-2 sm:p-3">
-                        <div className="space-y-3 sm:space-y-5">
+                      <div className="p-3 sm:p-4">
+                        <div className="space-y-4 sm:space-y-6">
                           {(Object.keys(chatModeConfig) as ChatMode[]).map((mode) => {
                             const config = chatModeConfig[mode];
                             const Icon = config.icon;
@@ -930,14 +930,14 @@ const formatMessageContent = (content: string) => {
                                 key={mode}
                                 variant="ghost"
                                 onClick={() => setChatMode(mode)}
-                                className={`w-full flex items-center gap-2 sm:gap-3 px-2 sm:px-3 py-1 sm:py-2 justify-start rounded-lg transition-colors ${
+                                className={`w-full flex items-center gap-3 sm:gap-4 px-3 sm:px-4 py-2 sm:py-3 justify-start rounded-lg transition-colors ${
                                   isActive ? "bg-gray-100 text-gray-900" : "hover:bg-gray-50"
                                 }`}
                               >
-                                <Icon className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600" />
+                                <Icon className="w-5 h-5 sm:w-6 sm:h-6 text-gray-600" />
                                 <div className="text-left">
-                                  <div className="text-xs sm:text-sm font-medium">{config.label}</div>
-                                  <div className="text-[10px] sm:text-xs text-gray-500">{config.description}</div>
+                                  <div className="text-sm sm:text-base font-medium">{config.label}</div>
+                                  <div className="text-xs sm:text-sm text-gray-500">{config.description}</div>
                                 </div>
                               </Button>
                             );
@@ -945,13 +945,13 @@ const formatMessageContent = (content: string) => {
                         </div>
 
                         {(chatMode === "property-listing" || chatMode === "ekarbot-ai") && (
-                          <div className="mt-2 sm:mt-3 border-t pt-1 sm:pt-2">
-                            <div className="text-[10px] sm:text-xs font-medium text-gray-500 mb-1 sm:mb-2 px-2">
+                          <div className="mt-3 sm:mt-4 border-t pt-2 sm:pt-3">
+                            <div className="text-xs sm:text-sm font-medium text-gray-500 mb-2 sm:mb-3 px-2">
                               {chatMode === "property-listing"
                                 ? "Property Listing Mode"
                                 : "EkarBot AI Mode"}
                             </div>
-                            <div className="flex gap-1 sm:gap-2 px-2">
+                            <div className="flex gap-2 sm:gap-3 px-2">
                               <Button
                                 variant={
                                   chatMode === "property-listing"
@@ -963,7 +963,7 @@ const formatMessageContent = (content: string) => {
                                     : "outline"
                                 }
                                 size="sm"
-                                className="flex-1 text-[10px] sm:text-xs"
+                                className="flex-1 text-sm sm:text-base py-2 sm:py-3"
                                 onClick={() =>
                                   chatMode === "property-listing"
                                     ? setPropertyListingMode("inhouse")
@@ -983,7 +983,7 @@ const formatMessageContent = (content: string) => {
                                     : "outline"
                                 }
                                 size="sm"
-                                className="flex-1 text-[10px] sm:text-xs"
+                                className="flex-1 text-sm sm:text-base py-2 sm:py-3"
                                 onClick={() =>
                                   chatMode === "property-listing"
                                     ? setPropertyListingMode("external")
@@ -996,10 +996,10 @@ const formatMessageContent = (content: string) => {
                           </div>
                         )}
 
-                        <div className="mt-2 sm:mt-4 px-2">
+                        <div className="mt-3 sm:mt-4 px-2">
                           <Button
                             onClick={() => setShowModeSelector(false)}
-                            className="w-full from-[#455560] to-[#3a464f] hover:from-[#3a464f] hover:to-[#455560] text-white rounded-lg text-[10px] sm:text-sm"
+                            className="w-full from-[#455560] to-[#3a464f] hover:from-[#3a464f] hover:to-[#455560] text-white rounded-lg text-sm sm:text-base py-2 sm:py-3"
                           >
                             Apply Settings
                           </Button>
@@ -1009,11 +1009,10 @@ const formatMessageContent = (content: string) => {
                   )}
                 </AnimatePresence>
 
-                <div className="flex-1 flex items-center gap-1 sm:gap-2 bg-white border border-gray-300 rounded-full px-2 sm:px-4 py-2 sm:py-3">
+                <div className="flex-1 flex items-center gap-2 sm:gap-3 bg-white border border-gray-300 rounded-full px-3 sm:px-4 py-2 sm:py-3">
                   <motion.div
-                    initial={{ rotate: 0, scale: 1 }}
+                    initial={{ scale: 1 }}
                     animate={{
-                      rotate: showModeSelector ? 45 : 0,
                       scale: showModeSelector ? 1.1 : 1,
                     }}
                     transition={{ duration: 0.3, ease: "easeInOut" }}
@@ -1022,9 +1021,9 @@ const formatMessageContent = (content: string) => {
                       variant="ghost"
                       size="icon"
                       onClick={() => setShowModeSelector(!showModeSelector)}
-                      className="shrink-0 rounded-full bg-gray-100 hover:bg-gray-200 w-8 h-8 sm:w-10 sm:h-10"
+                      className="shrink-0 rounded-full bg-gray-100 hover:bg-gray-200 w-10 h-10 sm:w-12 sm:h-12"
                     >
-                      <Plus className="w-3 h-3 sm:w-4 sm:h-4" />
+                      {showModeSelector ? <X className="w-4 h-4 sm:w-5 sm:h-5" /> : <Plus className="w-4 h-4 sm:w-5 sm:h-5" />}
                     </Button>
                   </motion.div>
 
@@ -1033,7 +1032,7 @@ const formatMessageContent = (content: string) => {
                     onChange={(e) => setChatPrompt(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleChatSubmit()}
                     placeholder="Ask EkarBot anything..."
-                    className="flex-1 border-0 focus-visible:ring-0 focus-visible:ring-offset-0 p-0 text-[10px] sm:text-sm"
+                    className="flex-1 border-0 focus-visible:ring-0 focus-visible:ring-offset-0 p-0 text-sm sm:text-base"
                     disabled={isSending}
                   />
 
@@ -1042,15 +1041,15 @@ const formatMessageContent = (content: string) => {
                   <Button
                     onClick={handleChatSubmit}
                     disabled={!chatPrompt.trim() || isSending}
-                    className="bg-[#455560] text-white rounded-full h-8 w-8 sm:h-10 sm:w-10 flex items-center justify-center p-0 shadow-md"
+                    className="bg-[#455560] text-white rounded-full h-10 w-10 sm:h-12 sm:w-12 flex items-center justify-center p-0 shadow-md"
                   >
-                    <ArrowUp className="w-3 h-3 sm:w-4 sm:h-4" />
+                    <ArrowUp className="w-4 h-4 sm:w-5 sm:h-5" />
                   </Button>
                 </div>
               </div>
 
-              <div className="mt-1 sm:mt-2 text-center">
-                <span className="text-[10px] sm:text-xs text-gray-500">
+              <div className="mt-2 sm:mt-3 text-center">
+                <span className="text-xs sm:text-sm text-gray-500">
                   Current mode: {chatModeConfig[chatMode].label}
                 </span>
               </div>

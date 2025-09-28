@@ -59,9 +59,10 @@ interface SalesAgentLayoutProps {
   currentPage: string;
   onNavigate: (page: string) => void;
   setCurrentSessionId?: (sessionId: string) => void;
+  currentSessionId?: string | null;
 }
 
-const SalesAgentLayout = ({ children, currentPage, onNavigate, setCurrentSessionId }: SalesAgentLayoutProps) => {
+const SalesAgentLayout = ({ children, currentPage, onNavigate, setCurrentSessionId, currentSessionId }: SalesAgentLayoutProps) => {
   const { user, profile, signOut } = useSalesAgentAuth();
   const [unreadCount, setUnreadCount] = useState(0);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -70,27 +71,28 @@ const SalesAgentLayout = ({ children, currentPage, onNavigate, setCurrentSession
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState('');
   const dropdownTriggerRef = useRef<HTMLButtonElement>(null);
+  const chatListRef = useRef<HTMLDivElement>(null);
 
   const menuItems = [
-  { 
-    id: 'ekarbot', 
-    label: <span className="font-semibold">EkarBot</span>, 
-    icon: () => (
-      <div className="relative flex items-center">
-        <img 
-          src="/lovable-uploads/00baa288-f375-4798-aa52-0272029ed647.png" 
-          alt="EkarBot" 
-          className="w-5 h-5 object-contain"
-        />  
-        <div className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full"></div>
-      </div>
-    )
-  },
-  { id: 'saved-projects', label: <span className="font-semibold">Saved Projects</span>, icon: BookmarkCheck },
-  { id: 'inbox', label: <span className="font-semibold">Inbox</span>, icon: MessageSquare, badge: unreadCount > 0 ? unreadCount.toString() : undefined },
-  { id: 'schedule-visit', label: <span className="font-semibold">Schedule Site Visit</span>, icon: Calendar },
-  { id: 'visits-list', label: <span className="font-semibold">My Site Visits</span>, icon: CalendarDays },
-];
+    { 
+      id: 'ekarbot', 
+      label: <span className="font-semibold">EkarBot</span>, 
+      icon: () => (
+        <div className="relative flex items-center">
+          <img 
+            src="/lovable-uploads/00baa288-f375-4798-aa52-0272029ed647.png" 
+            alt="EkarBot" 
+            className="w-5 h-5 object-contain"
+          />  
+          <div className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full"></div>
+        </div>
+      )
+    },
+    { id: 'saved-projects', label: <span className="font-semibold">Saved Projects</span>, icon: BookmarkCheck },
+    { id: 'inbox', label: <span className="font-semibold">Inbox</span>, icon: MessageSquare, badge: unreadCount > 0 ? unreadCount.toString() : undefined },
+    { id: 'schedule-visit', label: <span className="font-semibold">Schedule Site Visit</span>, icon: Calendar },
+    { id: 'visits-list', label: <span className="font-semibold">My Site Visits</span>, icon: CalendarDays },
+  ];
 
   useEffect(() => {
     fetchUnreadMessages();
@@ -98,6 +100,15 @@ const SalesAgentLayout = ({ children, currentPage, onNavigate, setCurrentSession
       fetchChatSessions();
     }
   }, [profile]);
+
+  useEffect(() => {
+    if (currentSessionId && chatListRef.current) {
+      const selectedChat = chatListRef.current.querySelector(`[data-session-id="${currentSessionId}"]`);
+      if (selectedChat) {
+        selectedChat.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    }
+  }, [currentSessionId, chatSessions]);
 
   const fetchChatSessions = async () => {
     if (!profile?.sales_agent_id) return;
@@ -344,23 +355,34 @@ const SalesAgentLayout = ({ children, currentPage, onNavigate, setCurrentSession
             Recent Chats
           </h3>
         )}
-        <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-transparent scrollbar-rounded-full space-y-1 pb-16 sm:pb-20">
-          {chatSessions.slice(0, isCollapsed && !isMobile ? 8 : 10).map((session) => (
+        <div ref={chatListRef} className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-transparent scrollbar-rounded-full space-y-1 pb-16 sm:pb-20">
+          {chatSessions.slice(0, isCollapsed && !isMobile ? 8 : 10).map((session) => {
+            const isActiveSession = currentSessionId === session.id;
+            return (
             <div
               key={session.id}
-              className={`group relative rounded-lg cursor-pointer transition-all duration-200 hover:bg-[#4555601A] hover:shadow-sm ${isCollapsed && !isMobile ? 'px-0' : 'px-1'}`}
+              data-session-id={session.id}
+              className={`group relative rounded-lg cursor-pointer transition-all duration-200 ${
+                isActiveSession 
+                  ? 'bg-gray-100 shadow-sm border-l-4 border-[#455560]' 
+                  : 'hover:bg-[#4555601A] hover:shadow-sm'
+              } ${isCollapsed && !isMobile ? 'px-0' : 'px-1'}`}
             >
               {isCollapsed && !isMobile ? (
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <div
-                        onClick={() => {
-                          setCurrentSessionId?.(session.id);
-                          onNavigate('ekarbot');
-                        }}
-                        className="w-full h-7 sm:h-9 flex items-center justify-center rounded-lg hover:bg-[#4555601A] transition-all duration-200"
-                      >
+                     <div
+                         onClick={() => {
+                           setCurrentSessionId?.(session.id);
+                           onNavigate('ekarbot');
+                         }}
+                         className={`w-full h-7 sm:h-9 flex items-center justify-center rounded-lg transition-all duration-200 ${
+                           isActiveSession 
+                             ? 'bg-gray-100 border-l-2 border-[#455560]' 
+                             : 'hover:bg-[#4555601A]'
+                         }`}
+                       >
                         <MessageCircle className="w-3 h-3 sm:w-4 sm:h-4 text-slate-600" />
                       </div>
                     </TooltipTrigger>
@@ -386,12 +408,16 @@ const SalesAgentLayout = ({ children, currentPage, onNavigate, setCurrentSession
                 </TooltipProvider>
               ) : (
                 <div
-                  onClick={() => {
-                    setCurrentSessionId?.(session.id);
-                    onNavigate('ekarbot');
-                  }}
-                  className="flex items-center justify-between py-1 sm:py-1.5 px-1 sm:px-2 rounded-lg hover:bg-[#4555601A] transition-all duration-200"
-                >
+                 onClick={() => {
+                     setCurrentSessionId?.(session.id);
+                     onNavigate('ekarbot');
+                   }}
+                   className={`flex items-center justify-between py-1 sm:py-1.5 px-1 sm:px-2 rounded-lg transition-all duration-200 ${
+                     isActiveSession 
+                       ? 'bg-gray-100' 
+                       : 'hover:bg-[#4555601A]'
+                   }`}
+                 >
                   <div className="flex-1 min-w-0 flex items-center gap-1 sm:gap-2">
                     <MessageCircle className="w-3 h-3 sm:w-4 sm:h-4 text-slate-600" />
                     <div className="min-w-0 flex-1">
@@ -452,7 +478,8 @@ const SalesAgentLayout = ({ children, currentPage, onNavigate, setCurrentSession
                 </div>
               )}
             </div>
-          ))}
+           );
+          })}
           {chatSessions.length === 0 && (
             <div className={`text-center py-4 sm:py-6 ${isCollapsed && !isMobile ? 'px-1' : 'px-2'}`}>
               <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-[#4555601A] flex items-center justify-center mx-auto mb-1 sm:mb-2">

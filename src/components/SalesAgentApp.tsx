@@ -95,6 +95,7 @@ const SalesAgentApp = () => {
       currentPage={currentPage} 
       onNavigate={setCurrentPage}
       setCurrentSessionId={handleSessionLoad}
+      currentSessionId={currentSessionId}
     >
       {renderPage()}
     </SalesAgentLayout>

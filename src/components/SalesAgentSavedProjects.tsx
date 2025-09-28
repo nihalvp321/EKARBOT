@@ -135,7 +135,7 @@ const SavedProjectsPage = () => {
           </h1>
           <Badge
             variant="secondary"
-            className="rounded-full px-3 py-1 text-xs md:text-sm font-medium bg-slate-100 text-slate-700"
+            className="rounded-full px-3 py-1 text-xs font-medium bg-slate-100 text-slate-700"
           >
             {savedProjects.length} {savedProjects.length === 1 ? 'Project' : 'Projects'}
           </Badge>

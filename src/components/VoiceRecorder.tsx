@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Mic, X, ArrowUp, Square } from 'lucide-react';
-import { useVoiceRecording } from '@/hooks/useVoiceRecording';
-import { cn } from '@/lib/utils';
+import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { X, ArrowUp, Square } from "lucide-react"; 
+import { FaMicrophone } from "react-icons/fa"; 
+import { useVoiceRecording } from "@/hooks/useVoiceRecording";
+import { cn } from "@/lib/utils";
 
 interface VoiceRecorderProps {
   onVoiceMessage: (text: string) => void;
@@ -23,6 +24,7 @@ export const VoiceRecorder = ({
     stopRecording,
     cancelRecording,
   } = useVoiceRecording();
+
   const [showRecordingUI, setShowRecordingUI] = useState(false);
   const [audioLevels, setAudioLevels] = useState<number[]>([0, 0, 0, 0, 0]);
 
@@ -92,9 +94,10 @@ export const VoiceRecorder = ({
               )}
             >
               {isRecording ? (
-                <Mic className="w-4 h-4" />
+                <FaMicrophone className="w-4 h-4" /> 
               ) : (
-                <ArrowUp className="w-4 h-4"/>              )}
+                <ArrowUp className="w-4 h-4" />
+              )}
             </div>
 
             {/* Ripple effect while recording */}
@@ -157,7 +160,7 @@ export const VoiceRecorder = ({
           {isRecording ? (
             <Square className="w-4 h-4" />
           ) : (
-            <ArrowUp className="w-4 h-4"/>
+            <ArrowUp className="w-4 h-4" />
           )}
         </Button>
       </div>
@@ -176,7 +179,7 @@ export const VoiceRecorder = ({
       )}
       aria-label="Start recording"
     >
-      <Mic className="w-4 h-4" />
+      <FaMicrophone className="w-3 h-3 sm:h-3 sm:w-3" /> {/* ✅ Idle state mic updated */}
     </button>
   );
 };

@@ -10,20 +10,16 @@ import {
   Bookmark, BookmarkCheck, MapPin, ArrowUp, Building, DollarSign, Eye, MessageSquare, Bot, Zap, Send, X, Plus, MoreHorizontal, Trash2, Edit, Sparkles, ArrowDown
 } from 'lucide-react';
 import { VoiceRecorder } from '@/components/VoiceRecorder';
-import ScrollToBottomButton from "@/components/ScrollToBottomButton"; // adjust the path
 import { supabase } from '@/integrations/supabase/client';
 import { useSalesAgentAuth } from '@/hooks/useSalesAgentAuth';
 import { toast } from 'sonner';
 import { sanitizeInput } from '@/utils/inputValidation';
 import { logSecurityEvent, checkRateLimit } from '@/utils/securityUtils';
 import ProjectDetailModal from '@/components/ProjectDetailModal';
-
-const scrollToBottom = () => {
-  window.scrollTo({
-    top: document.body.scrollHeight,
-    behavior: "smooth", // smooth scroll
-  });
-};
+import { LeadDetailsPopup } from './LeadDetailsPopup';
+import { CustomerDetailsPopup } from './CustomerDetailsPopup';
+import { ActivityDetailsPopup } from './ActivityDetailsPopup';
+import { ProjectDetailsPopup } from './ProjectDetailsPopup';
 
 
 interface SalesAgentMainPageProps {
@@ -77,35 +73,65 @@ const SalesAgentMainPage = ({
   const [showModeSelector, setShowModeSelector] = useState(false);
   const [chatMode, setChatMode] = useState<ChatMode>('ekarbot-ai');
   
-  // New state to store all projects from chat history
-  const [allSessionProjects, setAllSessionProjects] = useState<any[]>([]);
-  
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const { profile } = useSalesAgentAuth();
 
   const dropdownRef = useRef<HTMLDivElement | null>(null);
   const [showScrollDown, setShowScrollDown] = useState(false);
+  const [isNearBottom, setIsNearBottom] = useState(true);
+  const autoScrollByUserRef = useRef(false);
   const [sessionProjectIds, setSessionProjectIds] = useState<Set<string>>(new Set());
+  const [messageProjects, setMessageProjects] = useState<Record<string, any[]>>({});
+  const [messageEntityIds, setMessageEntityIds] = useState<Record<string, any>>({});
+  const [selectedEntityId, setSelectedEntityId] = useState<{ type: string; id: string } | null>(null);
 
-  // Modified useEffect to set projects from allSessionProjects instead of fetching
-  useEffect(() => {
-    if (allSessionProjects.length > 0) {
-      setProjects(allSessionProjects);
-    } else {
-      setProjects([]);
+  // Persistent storage functions
+  const saveToLocalStorage = (key: string, data: any) => {
+    if (profile?.sales_agent_id) {
+      try {
+        localStorage.setItem(`${key}_${profile.sales_agent_id}`, JSON.stringify(data));
+      } catch (error) {
+        console.warn('Failed to save to localStorage:', error);
+      }
     }
-  }, [allSessionProjects, setProjects]);
+  };
+
+  const loadFromLocalStorage = (key: string) => {
+    if (profile?.sales_agent_id) {
+      try {
+        const stored = localStorage.getItem(`${key}_${profile.sales_agent_id}`);
+        return stored ? JSON.parse(stored) : null;
+      } catch (error) {
+        console.warn('Failed to load from localStorage:', error);
+        return null;
+      }
+    }
+    return null;
+  };
 
   useEffect(() => {
-    if (profile?.sales_agent_id && !propCurrentSessionId) {
-      const storedId = localStorage.getItem(`currentSessionId_${profile.sales_agent_id}`);
-      if (storedId) {
-        setLocalCurrentSessionId(storedId);
+    if (currentSessionId && sessionProjectIds.size > 0) {
+      fetchProjects(Array.from(sessionProjectIds));
+      // Save session project IDs to localStorage per session
+      saveToLocalStorage(`sessionProjects_${currentSessionId}`, Array.from(sessionProjectIds));
+    }
+  }, [sessionProjectIds, currentSessionId]);
+
+  // Load persisted data on profile load
+  useEffect(() => {
+    if (profile?.sales_agent_id) {
+      // Load current session ID
+      if (!propCurrentSessionId) {
+        const storedId = localStorage.getItem(`currentSessionId_${profile.sales_agent_id}`);
+        if (storedId) {
+          setLocalCurrentSessionId(storedId);
+        }
       }
     }
   }, [profile, propCurrentSessionId]);
 
+  // Save current session ID to localStorage
   useEffect(() => {
     if (profile?.sales_agent_id && currentSessionId && !propCurrentSessionId) {
       localStorage.setItem(`currentSessionId_${profile.sales_agent_id}`, currentSessionId);
@@ -113,14 +139,14 @@ const SalesAgentMainPage = ({
   }, [currentSessionId, profile, propCurrentSessionId]);
 
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
+    function handleClickOutside(event: MouseEvent) {
       if (
         dropdownRef.current &&
         !dropdownRef.current.contains(event.target as Node)
       ) {
         setShowModeSelector(false);
       }
-    };
+    }
     document.addEventListener("mousedown", handleClickOutside);
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
@@ -151,33 +177,22 @@ const SalesAgentMainPage = ({
 
   const chatModeConfig = {
     'ekarbot-ai': {
-    label: 'EkarBot AI',
-    icon: MessageSquare,
-    description: `Proprietary AI assistant (${ekarBotMode})`,
-    get placeholder() {
-      return ekarBotMode === 'inhouse'
-        ? 'Ask about inhouse projects and CRM data...'
-        : 'Ask about external projects data...';
+      label: 'EkarBot AI',
+      icon: MessageSquare,
+      description: `Proprietary AI assistant (${ekarBotMode})`,
+      color: 'bg-blue-500 hover:bg-blue-600'
     },
-    color: 'from-[#455560] to-[#3a464f] hover:from-[#3a464f] hover:to-[#455560]'
-  },
     hybrid: {
       label: 'Hybrid Power',
       icon: Zap,
       description: 'Combined AI intelligence',
-      placeholder: 'Ask EkarBot anything...',
-      color: 'from-[#455560] to-[#3a464f] hover:from-[#3a464f] hover:to-[#455560]'
+      color: 'bg-purple-500 hover:bg-purple-600'
     },
     'property-listing': {
       label: 'Property Listing',
       icon: Building,
       description: `Fetch latest active listings (${propertyListingMode})`,
-      get placeholder() {
-      return propertyListingMode === 'inhouse'
-        ? 'Search inhouse property listings by name, type, or location...'
-        : 'Search external property listings by name, type, or location...';
-    },
-      color: 'from-[#455560] to-[#3a464f] hover:from-[#3a464f] hover:to-[#455560]'
+      color: 'bg-orange-500 hover:bg-orange-600'
     }
   };
 
@@ -198,11 +213,42 @@ const SalesAgentMainPage = ({
         if (!currentSessionId || !sessionIds.includes(currentSessionId)) {
           setCurrentSessionId(data[0].id);
         }
+      } else {
+        // If no sessions exist, create one with EkarBot initial message
+        await createInitialChatSession();
       }
     }
   };
 
-  // Modified fetchChatHistory to extract and store all projects from the session
+  const createInitialChatSession = async () => {
+    const session = await createNewChatSession();
+    if (session) {
+      // Add initial EkarBot greeting message
+      const initialMessage = "Hello! I'm EkarBot, your AI-powered real estate assistant. I'm here to help you find the perfect properties for your clients. How can I assist you today?";
+      
+      const { data, error } = await supabase
+        .from('chat_history')
+        .insert({
+          session_id: session.id,
+          chat_mode: 'ekarbot-ai',
+          bot_response: initialMessage,
+        })
+        .select()
+        .maybeSingle();
+
+      if (!error && data) {
+        const botMessage: ChatMessage = {
+          id: `${data.id}-bot`,
+          message_type: 'bot',
+          message_content: initialMessage,
+          chat_mode: 'ekarbot-ai',
+          created_at: data.created_at,
+        };
+        setChatHistory([botMessage]);
+      }
+    }
+  };
+
   const fetchChatHistory = async (sessionId: string) => {
     const { data, error } = await supabase
       .from('chat_history')
@@ -212,77 +258,152 @@ const SalesAgentMainPage = ({
 
     if (!error && data) {
       const transformed: ChatMessage[] = [];
-      const sessionProjects: any[] = [];
-      const projectIds = new Set<string>();
+      const allPropertyData = new Set<string>();
+      const projectsByMessage: Record<string, any[]> = {};
+      let lastUserRowId: string | null = null;
       
       for (const row of data as any[]) {
-        if (row.user_message) {
+        // Support both legacy paired-row schema (user_message/bot_response on same row)
+        // and normalized message-per-row schema (message_type/message_content)
+        if (row.message_type === 'user' || row.user_message) {
           transformed.push({
             id: `${row.id}-user`,
-            message_type: 'user' as const,
-            message_content: row.user_message,
+            message_type: 'user',
+            message_content: row.message_content ?? row.user_message,
             chat_mode: row.chat_mode,
             created_at: row.created_at,
           });
+          // Track the latest user message row id to associate following bot response
+          lastUserRowId = row.id;
         }
-        
-        if (row.bot_response) {
+
+        // Determine if this row contains a bot message
+        const hasBot = row.message_type === 'bot' || !!row.bot_response;
+        if (hasBot) {
+          // Ensure response_data is an object (some rows may store it as a JSON string)
+          let parsedResponse: any = row.response_data;
+          if (typeof parsedResponse === 'string') {
+            try {
+              parsedResponse = JSON.parse(parsedResponse);
+            } catch {
+              // leave as is if parsing fails
+            }
+          }
+
+          // Extract entity IDs if present in response_data
+          if (parsedResponse?.extractedIds) {
+            const ids = parsedResponse.extractedIds;
+            if (ids && Object.keys(ids).length > 0) {
+              setMessageEntityIds(prev => ({ ...prev, [`${row.id}-bot`]: ids }));
+            }
+          }
+
+          // Normalize projects from various historical payload shapes
+          const getProjectsFromResponse = (r: any): any[] => {
+            if (!r) return [];
+            const candidates = [
+              r?.projects,
+              r?.data?.projects,
+              r?.properties,
+              r?.listings,
+              r?.results,
+              r?.response?.projects,
+              r?.searchResults?.projects
+            ];
+            const found = candidates.find((c: any) => Array.isArray(c) && c.length > 0);
+            return Array.isArray(found) ? found : [];
+          };
+
+          const normalizedProjects = getProjectsFromResponse(parsedResponse);
+
           const botMessage: ChatMessage = {
             id: `${row.id}-bot`,
-            message_type: 'bot' as const,
-            message_content: row.bot_response,
+            message_type: 'bot',
+            message_content: row.message_content ?? row.bot_response ?? '',
             chat_mode: row.chat_mode,
-            response_data: row.response_data,
+            // Ensure response_data always exposes projects if we could normalize them
+            response_data: normalizedProjects.length > 0
+              ? { ...(typeof parsedResponse === 'object' ? parsedResponse : {}), projects: normalizedProjects }
+              : parsedResponse,
             created_at: row.created_at,
           };
           transformed.push(botMessage);
 
-          // Extract projects from response_data - handle both 'multiple' and 'single' types
-          if (row.response_data && typeof row.response_data === 'object') {
-            let projectsArray = null;
-            
-            // Check if it's the 'multiple' type format
-            if (row.response_data.type === 'multiple' && 
-                row.response_data.projects && 
-                Array.isArray(row.response_data.projects)) {
-              projectsArray = row.response_data.projects;
-            }
-            // Check if projects exist directly
-            else if (row.response_data.projects && 
-                     Array.isArray(row.response_data.projects)) {
-              projectsArray = row.response_data.projects;
-            }
+          // Extract project data from response_data and populate messageProjects immediately
+          if (normalizedProjects.length > 0) {
+            // If this is a standalone bot row, associate its projects with the previous user row
+            const targetBaseId = (row.message_type === 'bot' && lastUserRowId) ? lastUserRowId : row.id;
+            projectsByMessage[targetBaseId] = projectsByMessage[targetBaseId] || [];
 
-            // Process projects if found
-            if (projectsArray) {
-              projectsArray.forEach((project: any) => {
-                if (project && project.project_id && !projectIds.has(project.project_id)) {
-                  projectIds.add(project.project_id);
-                  sessionProjects.push(project);
-                }
-              });
-            }
+            normalizedProjects.forEach((project: any) => {
+              const pid = project.project_id || project.projectId || project.id;
+              if (pid) {
+                allPropertyData.add(pid);
+
+                // Map project data for immediate display
+                const mappedProject = {
+                  project_id: project.project_id || project.projectId || project.id,
+                  project_title: project.project_title || project.title || project.name,
+                  developer_name: project.developer_name || project.developer || project.builder,
+                  emirate: project.emirate || project.location || project.city,
+                  starting_price_aed: project.starting_price_aed || project.price || project.starting_price,
+                  cover_image_url: project.cover_image_url || project.image_url || project.image,
+                  source: project.source,
+                  project_subtype: project.project_subtype || project.subtype || project.type,
+                  url: project.url || project.link,
+                  region_area: project.region_area || project.area || project.region,
+                  description: project.description,
+                  match: {
+                    similarity_percentage: project.match?.similarity_percentage || project.similarity_percentage || 0,
+                    content: project.match?.content || project.reasoning || project.content || ''
+                  }
+                };
+
+                projectsByMessage[targetBaseId].push(mappedProject);
+              }
+            });
+
+            // Sort projects by similarity percentage
+            projectsByMessage[targetBaseId].sort((a, b) =>
+              (b.match?.similarity_percentage || 0) - (a.match?.similarity_percentage || 0)
+            );
           }
         }
       }
 
+      console.log('fetchChatHistory - Extracted projectsByMessage:', projectsByMessage);
+      console.log('fetchChatHistory - Total messages:', transformed.length);
+
       setChatHistory(transformed);
-      setAllSessionProjects(sessionProjects);
-      setSessionProjectIds(projectIds);
-
-      // Set the latest response data if there are any property listing messages
-      const propertyListingMessages = transformed.filter(
-        (msg) =>
-          msg.message_type === 'bot' &&
-          msg.response_data &&
-          typeof msg.response_data === 'object' &&
-          (msg.response_data as any)?.projects
-      );
-
-      if (propertyListingMessages.length > 0) {
-        const lastPropertyMessage = propertyListingMessages[propertyListingMessages.length - 1];
-        setN8nResponse(lastPropertyMessage.response_data);
+      
+      // Set messageProjects immediately from response_data
+      if (Object.keys(projectsByMessage).length > 0) {
+        console.log('Setting messageProjects from database response_data');
+        setMessageProjects(projectsByMessage);
+        
+        // Save to localStorage for next time
+        saveToLocalStorage(`messageProjects_${sessionId}`, projectsByMessage);
       }
+
+      // Update session project IDs with all extracted project data
+      if (allPropertyData.size > 0) {
+        const projectIds = Array.from(allPropertyData);
+        setSessionProjectIds(new Set(projectIds));
+        
+        // Set the most recent response data for current display
+        const lastPropertyMessage = transformed
+          .filter(msg => 
+            msg.message_type === 'bot' && 
+            msg.response_data && 
+            msg.response_data.projects?.length > 0
+          )
+          .pop();
+        
+          if (lastPropertyMessage && lastPropertyMessage.response_data) {
+            setN8nResponse(lastPropertyMessage.response_data);
+          }
+      }
+
     }
   };
 
@@ -307,7 +428,6 @@ const SalesAgentMainPage = ({
     setChatSessions(prev => [data as ChatSession, ...prev]);
     setCurrentSessionId((data as ChatSession).id);
     setChatHistory([]);
-    setAllSessionProjects([]); // Clear projects for new session
     setSessionProjectIds(new Set());
     setShowModeSelector(false);
     return data as ChatSession;
@@ -332,6 +452,17 @@ const SalesAgentMainPage = ({
     );
   };
 
+  const touchSessionUpdatedAt = async (sessionId: string) => {
+    try {
+      await supabase
+        .from('chat_sessions')
+        .update({ updated_at: new Date().toISOString() })
+        .eq('id', sessionId);
+    } catch (e) {
+      console.warn('Failed to touch session updated_at', e);
+    }
+  };
+
   const createUserMessage = async (sessionId: string, content: string) => {
     const { data, error } = await supabase
       .from('chat_history')
@@ -347,17 +478,36 @@ const SalesAgentMainPage = ({
       console.error('createUserMessage insert error:', error);
       return null;
     }
+    
     return data as { id: string; created_at: string } | null;
   };
 
   const updateBotResponse = async (rowId: string, content: string, responseData?: any) => {
+    // First, store full n8n response in chat_history
     const { error } = await supabase
       .from('chat_history')
       .update({ bot_response: content, response_data: responseData })
       .eq('id', rowId);
 
     if (error) {
-      console.error('updateBotResponse error:', error);
+      console.error('Error updating bot response:', error);
+      return;
+    }
+
+  };
+
+  const fetchProjects = async (filterIds: string[] = []) => {
+    try {
+      setLoadingProjects(true);
+      const query = supabase.from('projects').select('*').eq('is_active', true);
+      if (filterIds.length > 0) query.in('project_id', filterIds);
+      const { data, error } = await query.order('created_at', { ascending: false });
+      if (error) throw error;
+      setProjects(data || []);
+    } catch {
+      toast.error('Failed to fetch projects');
+    } finally {
+      setLoadingProjects(false);
     }
   };
 
@@ -366,6 +516,9 @@ const SalesAgentMainPage = ({
     const { data } = await supabase.from('saved_projects').select('project_id').eq('sales_agent_id', profile.sales_agent_id);
     setSavedProjectIds(data?.map((d) => d.project_id) || []);
   };
+
+
+
 
   const handleSaveToggle = async (projectId: string) => {
     if (!profile?.sales_agent_id) return;
@@ -415,7 +568,7 @@ const SalesAgentMainPage = ({
       sessionId = created.id;
     }
 
-    scrollToBottom();
+    autoScrollByUserRef.current = true;
 
     const sanitizedPrompt = sanitizeInput(chatPrompt);
     const userMessage = chatPrompt;
@@ -496,62 +649,164 @@ const SalesAgentMainPage = ({
       }
 
       console.log('Bot response to save:', botResponse);
+      console.log('Full response data:', parsed);
 
-      let responseDataToSave = parsed;
-
-      if (chatMode === 'property-listing' && parsed.projects && Array.isArray(parsed.projects) && parsed.projects.length > 0) {
-        const projectIds = parsed.projects.map((p: any) => p.project_id);
-        const { data: fullProjects, error: fetchError } = await supabase
-          .from('projects')
-          .select('*')
-          .eq('is_active', true)
-          .in('project_id', projectIds);
-
-        if (fetchError) {
-          console.error('Failed to fetch full projects:', fetchError);
-          toast.error('Failed to load project details');
-        } else {
-          const enhancedProjects = parsed.projects.map((match: any) => {
-            const full = fullProjects.find((p: any) => p.project_id === match.project_id);
-            return full ? { ...full, match: { similarity_percentage: match.similarity_percentage, content: match.content } } : null;
-          }).filter(Boolean);
-
-          responseDataToSave = { ...parsed, projects: enhancedProjects };
-          setN8nResponse(responseDataToSave);
-          
-          // Update allSessionProjects with new projects
-          const newProjectIds = new Set(sessionProjectIds);
-          const newSessionProjects = [...allSessionProjects];
-          
-          enhancedProjects.forEach((project: any) => {
-            if (!newProjectIds.has(project.project_id)) {
-              newProjectIds.add(project.project_id);
-              newSessionProjects.push(project);
-            }
-          });
-          
-          setSessionProjectIds(newProjectIds);
-          setAllSessionProjects(newSessionProjects);
+      // Extract entity IDs from bot response using OpenAI
+      let extractedIds = {};
+      try {
+        console.log('🔍 Extracting entity IDs from bot response...');
+        const { data: extractData, error: extractError } = await supabase.functions.invoke('extract-entity-ids', {
+          body: { message: botResponse }
+        });
+        
+        if (!extractError && extractData?.extractedIds) {
+          extractedIds = extractData.extractedIds;
+          console.log('✅ Extracted IDs:', extractedIds);
         }
-      } else {
-        setN8nResponse(parsed);
+      } catch (error) {
+        console.error('⚠️ Error extracting IDs (continuing anyway):', error);
+      }
+
+      // Enrich response with full project data so cards persist on refresh/navigation
+      let finalResponse: any = parsed;
+      try {
+        // Normalize projects array from various possible n8n payload shapes
+        const getProjects = (r: any) => {
+          const candidates = [
+            r?.projects,
+            r?.data?.projects,
+            r?.properties,
+            r?.listings,
+            r?.results,
+            r?.response?.projects
+          ];
+          return candidates.find((c: any) => Array.isArray(c) && c.length > 0) || [];
+        };
+
+        const normalizedProjects: any[] = getProjects(parsed);
+
+        if (normalizedProjects.length > 0) {
+          const ids = normalizedProjects
+            .map((p: any) => p.project_id || p.projectId || p.id)
+            .filter(Boolean);
+          if (ids.length > 0) {
+            const { data: dbProjects, error: dbErr } = await supabase
+              .from('projects')
+              .select('*')
+              .in('project_id', ids);
+            if (!dbErr && Array.isArray(dbProjects)) {
+              const byId = new Map<string, any>(dbProjects.map((p: any) => [p.project_id, p]));
+              const merged = normalizedProjects.map((item: any) => {
+                const pid = item.project_id || item.projectId || item.id;
+                const base = byId.get(pid);
+                const match = {
+                  similarity_percentage: item.match?.similarity_percentage ?? item.similarity_percentage ?? 0,
+                  content: item.match?.content ?? item.content ?? item.reasoning ?? ''
+                };
+                return base ? { ...base, match } : { project_id: pid, match, ...item };
+              });
+              finalResponse = { ...parsed, projects: merged };
+            } else {
+              // Even if DB fetch fails, ensure we have projects array normalized
+              finalResponse = { ...parsed, projects: normalizedProjects };
+            }
+          } else {
+            finalResponse = { ...parsed, projects: normalizedProjects };
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to enrich response with full project data:', e);
+        finalResponse = parsed;
+      }
+
+      // Add extracted IDs to finalResponse
+      if (Object.keys(extractedIds).length > 0) {
+        finalResponse = { ...finalResponse, extractedIds };
       }
 
       if (insertedRow?.id) {
-        await updateBotResponse(insertedRow.id, botResponse, responseDataToSave);
+        await updateBotResponse(insertedRow.id, botResponse, finalResponse);
+        
+        // Store extracted IDs in state for immediate display
+        if (Object.keys(extractedIds).length > 0) {
+          setMessageEntityIds(prev => ({ ...prev, [`${insertedRow.id}-bot`]: extractedIds }));
+        }
+        if (sessionId) {
+          await touchSessionUpdatedAt(sessionId);
+        }
 
         const botMessageObj: ChatMessage = {
           id: `${insertedRow.id}-bot`,
           message_type: 'bot',
           message_content: botResponse,
           chat_mode: chatMode,
-          response_data: responseDataToSave,
+          response_data: finalResponse,
           created_at: new Date().toISOString(),
         };
         setChatHistory((prev) => [...prev, botMessageObj]);
+
+        // Immediately extract and populate messageProjects for instant card display
+        if (finalResponse.projects && Array.isArray(finalResponse.projects) && finalResponse.projects.length > 0) {
+          console.log('Processing project data from response:', finalResponse.projects);
+          
+          const baseMessageId = insertedRow.id;
+          const mappedProjects = finalResponse.projects.map((project: any) => ({
+            project_id: project.project_id,
+            project_title: project.project_title,
+            developer_name: project.developer_name,
+            emirate: project.emirate,
+            starting_price_aed: project.starting_price_aed,
+            cover_image_url: project.cover_image_url,
+            source: project.source,
+            project_subtype: project.project_subtype,
+            url: project.url,
+            region_area: project.region_area,
+            match: {
+              similarity_percentage: project.match?.similarity_percentage ?? project.similarity_percentage ?? 0,
+              content: project.match?.content ?? project.reasoning ?? project.content ?? ''
+            }
+          }));
+
+          // Sort by similarity percentage
+          mappedProjects.sort((a, b) => 
+            (b.match?.similarity_percentage || 0) - (a.match?.similarity_percentage || 0)
+          );
+
+          // Immediately update messageProjects for instant display
+          setMessageProjects(prev => ({
+            ...prev,
+            [baseMessageId]: mappedProjects
+          }));
+
+          // Update session project IDs (append, don't replace)
+          setSessionProjectIds(prev => {
+            const updated = new Set(prev);
+            finalResponse.projects.forEach((p: any) => {
+              const pid = p.project_id || p.projectId || p.id;
+              if (pid) updated.add(pid);
+            });
+            return updated;
+          });
+
+          // Save to localStorage for persistence
+          saveToLocalStorage(`messageProjects_${currentSessionId}`, {
+            ...loadFromLocalStorage(`messageProjects_${currentSessionId}`) || {},
+            [baseMessageId]: mappedProjects
+          });
+
+        }
       }
 
-      scrollToBottom();
+      setN8nResponse(finalResponse);
+      if (currentSessionId) {
+        saveToLocalStorage(`lastResponse_${currentSessionId}`, finalResponse);
+        if (finalResponse?.projects && Array.isArray(finalResponse.projects) && finalResponse.projects.length > 0) {
+          const existing = loadFromLocalStorage(`responseHistory_${currentSessionId}`) || [];
+          const nextHistory = Array.isArray(existing) ? [...existing, finalResponse] : [finalResponse];
+          saveToLocalStorage(`responseHistory_${currentSessionId}`, nextHistory);
+        }
+      }
+      /* auto-scroll handled by effect */
     } catch (error) {
       console.error('Chat error:', error);
       const errorMessage = error instanceof Error ? error.message : 'Connection failed';
@@ -567,11 +822,19 @@ const SalesAgentMainPage = ({
     setChatPrompt(text);
   };
 
+  // Persist chat history per session to localStorage
   useEffect(() => {
-    if (bottomRef.current) {
-      bottomRef.current.scrollIntoView({ behavior: 'smooth' });
+    if (currentSessionId) {
+      saveToLocalStorage(`chatHistory_${currentSessionId}`, chatHistory);
     }
-  }, [chatHistory, isSending]);
+  }, [chatHistory, currentSessionId]);
+
+  useEffect(() => {
+    if (autoScrollByUserRef.current || isNearBottom) {
+      scrollToBottom();
+    }
+    autoScrollByUserRef.current = false;
+  }, [chatHistory, isSending, isNearBottom]);
   
   const scrollToBottom = () => {
     requestAnimationFrame(() => {
@@ -589,10 +852,129 @@ const SalesAgentMainPage = ({
   }, [profile]);
 
   useEffect(() => {
-    if (currentSessionId) {
-      fetchChatHistory(currentSessionId);
+    if (!currentSessionId) return;
+    
+    // First, try to load from localStorage for instant display
+    const persistedHistory = loadFromLocalStorage(`chatHistory_${currentSessionId}`);
+    const persistedProjects = loadFromLocalStorage(`sessionProjects_${currentSessionId}`);
+    const persistedResponse = loadFromLocalStorage(`lastResponse_${currentSessionId}`);
+    const persistedResponseHistory = loadFromLocalStorage(`responseHistory_${currentSessionId}`);
+    const persistedMessageProjects = loadFromLocalStorage(`messageProjects_${currentSessionId}`);
+    
+    if (persistedHistory && Array.isArray(persistedHistory)) {
+      // Normalize any stringified response_data back to objects for bot messages
+      const normalized = persistedHistory.map((m: any) => {
+        if (m?.message_type === 'bot' && typeof m?.response_data === 'string') {
+          try { return { ...m, response_data: JSON.parse(m.response_data) }; } catch { return m; }
+        }
+        return m;
+      });
+      setChatHistory(normalized);
+      console.log('Loaded persisted chat history:', normalized.length, 'messages');
     }
+    
+    if (persistedProjects && Array.isArray(persistedProjects)) {
+      setSessionProjectIds(new Set(persistedProjects));
+      console.log('Loaded persisted project IDs:', persistedProjects);
+      // Ensure projects are fetched immediately for instant card rendering
+      if (persistedProjects.length > 0) {
+        fetchProjects(persistedProjects);
+      }
+    }
+
+    // Load persisted messageProjects from localStorage
+    if (persistedMessageProjects && typeof persistedMessageProjects === 'object') {
+      // Normalize keys to base row id (strip -bot/-user suffixes)
+      const normalized: Record<string, any[]> = {};
+      Object.keys(persistedMessageProjects).forEach((k) => {
+        const base = k.replace(/-(bot|user)$/,'');
+        if (!normalized[base]) normalized[base] = [];
+        const arr = Array.isArray(persistedMessageProjects[k]) ? persistedMessageProjects[k] : [];
+        normalized[base] = arr;
+      });
+      setMessageProjects(normalized);
+      saveToLocalStorage(`messageProjects_${currentSessionId}`, normalized);
+      console.log('Loaded and normalized persisted message projects from localStorage');
+    } else if (persistedHistory && Array.isArray(persistedHistory)) {
+      // If messageProjects not in localStorage, extract from response_data in chat history
+      const extractedProjects: Record<string, any[]> = {};
+      persistedHistory.forEach((m: any) => {
+        if (m.message_type === 'bot') {
+          const r = m.response_data;
+          const candidates = [
+            r?.projects,
+            r?.data?.projects,
+            r?.properties,
+            r?.listings,
+            r?.results,
+            r?.response?.projects,
+            r?.searchResults?.projects
+          ];
+          const found = candidates.find((c: any) => Array.isArray(c) && c.length > 0) || [];
+          if (Array.isArray(found) && found.length > 0) {
+            const baseMessageId = typeof m.id === 'string' ? m.id.replace(/-(bot|user)$/,'') : m.id;
+            extractedProjects[baseMessageId] = found.map((project: any) => ({
+              project_id: project.project_id || project.projectId || project.id,
+              project_title: project.project_title || project.title || project.name,
+              developer_name: project.developer_name || project.developer || project.builder,
+              emirate: project.emirate || project.location || project.city,
+              starting_price_aed: project.starting_price_aed || project.price || project.starting_price,
+              cover_image_url: project.cover_image_url || project.image_url || project.image,
+              source: project.source,
+              project_subtype: project.project_subtype || project.subtype || project.type,
+              url: project.url || project.link,
+              region_area: project.region_area || project.area || project.region,
+              match: {
+                similarity_percentage: project.match?.similarity_percentage ?? project.similarity_percentage ?? 0,
+                content: project.match?.content ?? project.reasoning ?? project.content ?? ''
+              }
+            })).sort((a: any, b: any) => (b.match?.similarity_percentage || 0) - (a.match?.similarity_percentage || 0));
+          }
+        }
+      });
+      
+      if (Object.keys(extractedProjects).length > 0) {
+        setMessageProjects(extractedProjects);
+        // Save to localStorage for next time
+        saveToLocalStorage(`messageProjects_${currentSessionId}`, extractedProjects);
+        console.log('Extracted message projects from response_data:', extractedProjects);
+      }
+    }
+
+    // Hydrate all property-listing responses for instant card rendering
+    const hasPropertyMessagesInPersisted = Array.isArray(persistedHistory) && persistedHistory.some(
+      (m: any) => m.message_type === 'bot' && m.chat_mode === 'property-listing' && (m.response_data as any)?.projects?.length > 0
+    );
+
+    if (persistedResponse && typeof persistedResponse === 'object') {
+      setN8nResponse(persistedResponse);
+    } else {
+      setN8nResponse(null);
+    }
+    
+    // Then fetch fresh data from Supabase
+    fetchChatHistory(currentSessionId);
   }, [currentSessionId]);
+
+
+  // Ensure all projects referenced in chatHistory are fetched
+  useEffect(() => {
+    const ids = new Set<string>();
+    chatHistory.forEach((m) => {
+      const projects = (m as any)?.response_data?.projects;
+      if (Array.isArray(projects)) {
+        projects.forEach((p: any) => {
+          const pid = p?.project_id ?? p?.projectId ?? p?.id;
+          if (pid) ids.add(pid);
+        });
+      }
+    });
+    if (ids.size > 0) {
+      setSessionProjectIds((prev) => new Set([...prev, ...Array.from(ids)]));
+    }
+  }, [chatHistory]);
+
+  // Fetch message projects when chat history or session changes
 
   const formatTime = (dateString: string) => {
     return new Intl.DateTimeFormat('en-US', {
@@ -640,7 +1022,7 @@ const formatMessageContent = (content: string) => {
         {/* Main heading */}
         {mainHeading && (
           <div className="mb-4">
-            <h3 className="text-xs sm:text-sm font-bold text-gray-800 leading-relaxed">
+            <h3 className="text-sm sm:text-base font-bold text-gray-800 leading-relaxed">
               {parseBoldText(mainHeading)}
             </h3>
           </div>
@@ -662,10 +1044,10 @@ const formatMessageContent = (content: string) => {
           const details = lines.slice(1).filter(line => /^\s*[-•]\s/.test(line.trim()));
           
           return (
-            <div key={index} className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-md p-3 border border-blue-100 shadow-sm">
+            <div key={index} className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-4 border border-blue-100 shadow-sm">
               {/* Project header */}
-              <div className="mb-2">
-                <h4 className="text-xs sm:text-sm font-bold text-blue-900">
+              <div className="mb-3">
+                <h4 className="text-sm sm:text-base font-bold text-blue-900">
                   {projectNumber}
                   <span className="font-bold">{projectName}</span>
                   {projectLocation && (
@@ -678,7 +1060,7 @@ const formatMessageContent = (content: string) => {
               
               {/* Project details */}
               {details.length > 0 && (
-                <div className="space-y-1">
+                <div className="space-y-2">
                   {details.map((detail, detailIndex) => {
                     const cleanDetail = detail.replace(/^\s*[-•]\s*/, '').trim();
                     
@@ -688,8 +1070,8 @@ const formatMessageContent = (content: string) => {
                     if (kvMatch) {
                       const [, key, value] = kvMatch;
                       return (
-                        <div key={detailIndex} className="flex flex-col sm:flex-row sm:items-start gap-1">
-                          <span className="font-bold text-xs sm:text-sm text-gray-700 min-w-20">
+                        <div key={detailIndex} className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-2">
+                          <span className="font-bold text-xs sm:text-sm text-gray-700 min-w-24">
                             {parseBoldText(key.trim())}:
                           </span>
                           <span className="text-xs sm:text-sm text-gray-600 flex-1">
@@ -699,8 +1081,8 @@ const formatMessageContent = (content: string) => {
                       );
                     } else {
                       return (
-                        <div key={detailIndex} className="flex items-start gap-1">
-                          <span className="text-blue-500 text-xs mt-0.5">•</span>
+                        <div key={detailIndex} className="flex items-start gap-2">
+                          <span className="text-blue-500 text-xs mt-1">•</span>
                           <span className="text-xs sm:text-sm text-gray-600 flex-1">
                             {parseBoldText(cleanDetail)}
                           </span>
@@ -717,13 +1099,80 @@ const formatMessageContent = (content: string) => {
     );
   }
   
+  // If message contains entity-style items (Lead/Customer/Activity/Project blocks),
+  // render each block and attach corresponding "View" buttons under each item.
+  const entityItemRegex = /(Lead \(lead_id:|Customer ID:|Activity ID:|project_id:|Project ID:)/i;
+  if (entityItemRegex.test(normalizedContent)) {
+    const paragraphs = normalizedContent.split(/\n\s*\n+/).filter(Boolean);
+    let header = '';
+    let items = paragraphs;
+    if (!entityItemRegex.test(paragraphs[0])) {
+      header = paragraphs[0];
+      items = paragraphs.slice(1);
+    }
+
+    const extractIds = (text: string) => {
+      const lead = text.match(/lead_id:\s*([A-Z0-9\-]+)/i)?.[1];
+      const customer = text.match(/Customer ID:\s*([A-Z0-9\-]+)/i)?.[1];
+      const activity = text.match(/activity_id:\s*([A-Z0-9\-]+)/i)?.[1];
+      const project = text.match(/(?:project_id|Project ID):\s*([A-Z0-9\-]+)/i)?.[1];
+      return { lead, customer, activity, project };
+    };
+
+    return (
+      <div className="space-y-3">
+        {header && (
+          <p className="text-xs sm:text-sm leading-relaxed">{parseBoldText(header.trim())}</p>
+        )}
+        {items.map((block, idx) => {
+          const lines = block.split('\n').filter(l => l.trim());
+          const text = block.trim();
+          const ids = extractIds(text);
+          return (
+            <div key={idx} className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+              <div className="text-xs sm:text-sm leading-relaxed space-y-1">
+                {lines.map((l, i) => (
+                  <p key={i}>{parseBoldText(l.trim())}</p>
+                ))}
+              </div>
+              {(ids.lead || ids.customer || ids.activity || ids.project) && (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {ids.lead && (
+                    <Button size="sm" variant="outline" className="text-xs" onClick={() => setSelectedEntityId({ type: 'lead', id: ids.lead! })}>
+                      <Eye className="w-3 h-3 mr-1" /> View Lead {ids.lead}
+                    </Button>
+                  )}
+                  {ids.customer && (
+                    <Button size="sm" variant="outline" className="text-xs" onClick={() => setSelectedEntityId({ type: 'customer', id: ids.customer! })}>
+                      <Eye className="w-3 h-3 mr-1" /> View Customer {ids.customer}
+                    </Button>
+                  )}
+                  {ids.activity && (
+                    <Button size="sm" variant="outline" className="text-xs" onClick={() => setSelectedEntityId({ type: 'activity', id: ids.activity! })}>
+                      <Eye className="w-3 h-3 mr-1" /> View Activity {ids.activity}
+                    </Button>
+                  )}
+                  {ids.project && (
+                    <Button size="sm" variant="outline" className="text-xs" onClick={() => setSelectedEntityId({ type: 'project', id: ids.project! })}>
+                      <Eye className="w-3 h-3 mr-1" /> View Project {ids.project}
+                    </Button>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+  
   // For simple/single responses, use enhanced formatting with bold text support
   // Handle line breaks in simple content too
   const simpleLines = normalizedContent.split('\n').filter(line => line.trim());
   
   if (simpleLines.length > 1) {
     return (
-      <div className="text-xs sm:text-sm leading-relaxed space-y-1">
+      <div className="text-xs sm:text-sm leading-relaxed space-y-2">
         {simpleLines.map((line, index) => (
           <p key={index}>{parseBoldText(line.trim())}</p>
         ))}
@@ -738,49 +1187,35 @@ const formatMessageContent = (content: string) => {
   );
 };
 
-  useEffect(() => {
+  const handleChatScroll = () => {
     const chatContainer = chatContainerRef.current;
     if (!chatContainer) return;
-
-    const handleScroll = () => {
-      const { scrollTop, scrollHeight, clientHeight } = chatContainer;
-      const isScrolledUp = scrollTop + clientHeight < scrollHeight - 50;
-      setShowScrollDown(isScrolledUp);
-    };
-
-    chatContainer.addEventListener('scroll', handleScroll);
-    return () => chatContainer.removeEventListener('scroll', handleScroll);
-  }, []);
+    const { scrollTop, scrollHeight, clientHeight } = chatContainer;
+    const isScrolledUp = scrollTop + clientHeight < scrollHeight - 50;
+    setIsNearBottom(!isScrolledUp);
+    setShowScrollDown(isScrolledUp);
+  };
 
   return (
-
-    
-    <div className="min-h-screen flex flex-col bg-gray-50">
+    <div className="h-screen flex flex-col bg-gray-50">
       <div className="flex-1 flex flex-col pb-28 sm:pb-32">
-        <div ref={chatContainerRef} className="flex-1 overflow-y-auto p-2 sm:p-3">
+        <div ref={chatContainerRef} onScroll={handleChatScroll} className="flex-1 overflow-y-auto p-4 sm:p-6">
           {currentSessionId ? (
-            <div className="max-w-6xl mx-auto space-y-3 sm:space-y-4">
+            <div className="max-w-7xl mx-auto space-y-4 sm:space-y-6">
               {chatHistory.map((message) => (
-                <div key={message.id} className="space-y-3 sm:space-y-4">
-                  {!(message.message_type === 'bot' && message.response_data && (() => {
-  const responseData = message.response_data as any;
-  const projects = responseData?.type === 'multiple' 
-    ? responseData?.projects 
-    : responseData?.projects;
-  const hasProjects = projects && Array.isArray(projects) && projects.length > 0;
-  return hasProjects;
-})()) && (
-                      <div
+                <div key={message.id} className="space-y-4 sm:space-y-6">
+                  {!(message.message_type === 'bot' && message.chat_mode === 'property-listing' && message.response_data?.projects?.length > 0) && (
+                    <div
                       className={`flex ${message.message_type === 'user' ? 'justify-end' : 'justify-start'}`}
                     >
                       <div
-                        className={`max-w-[85%] sm:max-w-[80%] md:max-w-[65%] rounded-lg sm:rounded-xl px-2 sm:px-3 md:px-4 py-1 sm:py-2 md:py-3 ${
+                        className={`max-w-[90%] sm:max-w-[85%] md:max-w-[70%] rounded-xl sm:rounded-2xl px-3 sm:px-4 md:px-6 py-2 sm:py-3 md:py-4 ${
                           message.message_type === 'user'
                             ? 'bg-[#455560] text-white'
                             : 'bg-white border border-gray-200 shadow-sm'
                         }`}
                       >
-                        <div className="flex items-start gap-1 sm:gap-2">
+                        <div className="flex items-start gap-2 sm:gap-3">
                           {message.message_type === 'bot' && (
                             <div className="shrink-0 w-6 h-6 sm:w-8 sm:h-8 bg-gray-100 rounded-full flex items-center justify-center">
                               <img 
@@ -796,9 +1231,101 @@ const formatMessageContent = (content: string) => {
                                 {message.message_content}
                               </p>
                             ) : (
-                              formatMessageContent(message.message_content)
+                              <>
+                                {formatMessageContent(message.message_content)}
+                                
+                                {/* Entity Details Buttons - Inside bot message */}
+                                {(() => {
+                                  const entityIds = messageEntityIds[message.id];
+                                  console.log('🔍 Checking entity IDs for message:', message.id, entityIds);
+                                  if (!entityIds || Object.keys(entityIds).length === 0) return null;
+                                  const contentText = message.message_content || '';
+                                  const hasPerItemEntities = /(Lead \(lead_id:|Customer ID:|Activity ID:|project_id:|Project ID:)/i.test(contentText);
+                                  if (hasPerItemEntities) return null; // Per-item buttons already rendered inside content
+                                  return (
+                                  <div className="mt-3 pt-3 border-t border-gray-200 space-y-2">
+                                    {messageEntityIds[message.id].lead_ids && messageEntityIds[message.id].lead_ids.length > 0 && (
+                                      <div className="space-y-1">
+                                        <p className="text-xs font-semibold text-gray-700">Leads:</p>
+                                        <div className="flex flex-wrap gap-2">
+                                          {messageEntityIds[message.id].lead_ids.map((leadId: string, idx: number) => (
+                                            <Button
+                                              key={`lead-${idx}`}
+                                              size="sm"
+                                              variant="outline"
+                                              className="text-xs"
+                                              onClick={() => setSelectedEntityId({ type: 'lead', id: leadId })}
+                                            >
+                                              <Eye className="w-3 h-3 mr-1" />
+                                              View Lead {leadId}
+                                            </Button>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+                                    {messageEntityIds[message.id].customer_ids && messageEntityIds[message.id].customer_ids.length > 0 && (
+                                      <div className="space-y-1">
+                                        <p className="text-xs font-semibold text-gray-700">Customers:</p>
+                                        <div className="flex flex-wrap gap-2">
+                                          {messageEntityIds[message.id].customer_ids.map((customerId: string, idx: number) => (
+                                            <Button
+                                              key={`customer-${idx}`}
+                                              size="sm"
+                                              variant="outline"
+                                              className="text-xs"
+                                              onClick={() => setSelectedEntityId({ type: 'customer', id: customerId })}
+                                            >
+                                              <Eye className="w-3 h-3 mr-1" />
+                                              View Customer {customerId}
+                                            </Button>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+                                    {messageEntityIds[message.id].activity_ids && messageEntityIds[message.id].activity_ids.length > 0 && (
+                                      <div className="space-y-1">
+                                        <p className="text-xs font-semibold text-gray-700">Activities:</p>
+                                        <div className="flex flex-wrap gap-2">
+                                          {messageEntityIds[message.id].activity_ids.map((activityId: string, idx: number) => (
+                                            <Button
+                                              key={`activity-${idx}`}
+                                              size="sm"
+                                              variant="outline"
+                                              className="text-xs"
+                                              onClick={() => setSelectedEntityId({ type: 'activity', id: activityId })}
+                                            >
+                                              <Eye className="w-3 h-3 mr-1" />
+                                              View Activity {activityId}
+                                            </Button>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+                                    {messageEntityIds[message.id].project_ids && messageEntityIds[message.id].project_ids.length > 0 && (
+                                      <div className="space-y-1">
+                                        <p className="text-xs font-semibold text-gray-700">Projects:</p>
+                                        <div className="flex flex-wrap gap-2">
+                                          {messageEntityIds[message.id].project_ids.map((projectId: string, idx: number) => (
+                                            <Button
+                                              key={`project-${idx}`}
+                                              size="sm"
+                                              variant="outline"
+                                              className="text-xs"
+                                              onClick={() => setSelectedEntityId({ type: 'project', id: projectId })}
+                                            >
+                                              <Eye className="w-3 h-3 mr-1" />
+                                              View Project {projectId}
+                                            </Button>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                  );
+                                })()}
+                              </>
                             )}
-                            <p className={`text-xs mt-1 ${
+                            <p className={`text-[10px] sm:text-xs mt-1 sm:mt-2 ${
                               message.message_type === 'user' ? 'text-blue-100' : 'text-gray-500'
                             }`}>
                               {formatTime(message.created_at)}
@@ -809,145 +1336,87 @@ const formatMessageContent = (content: string) => {
                     </div>
                   )}
 
-                 {message.message_type === 'bot' && message.response_data && (() => {
-                    const responseData = message.response_data as any;
-                    const projects = responseData?.type === 'multiple' 
-                      ? responseData?.projects 
-                      : responseData?.projects;
-                    return projects && Array.isArray(projects) && projects.length > 0;
-                  })() && !loadingProjects && (
-                    (() => {
-                      const responseData = message.response_data as any;
-                      // Handle both 'type: multiple' format and direct projects array
-                      const projectsArray = responseData?.type === 'multiple' 
-                        ? responseData?.projects 
-                        : responseData?.projects;
-                      
-                      if (!projectsArray || !Array.isArray(projectsArray)) return null;
+                  {/* Remove the old entity buttons section that was outside the message */}
 
-                      const localSortedProjects = projectsArray
-                        .map((p: any) => {
-                          const percentage = p.match?.similarity_percentage
-                            ? parseFloat(String(p.match.similarity_percentage).replace('%', ''))
-                            : 0;
-                          return { ...p, match: { ...p.match, similarity_percentage: percentage } };
-                        })
-                        .sort((a: any, b: any) => b.match.similarity_percentage - a.match.similarity_percentage);
-
-                      return (
-                        <div className="mt-3 sm:mt-4">
-                          <div className="mb-1 sm:mb-2 text-center">
-                            <Badge className="bg-[#455560] text-white px-2 sm:px-3 py-0.5 sm:py-1 text-xs sm:text-sm">
-                              {localSortedProjects.length === 1
-                                ? "🏠 Here is the 1 property as you requested"
-                                : `🏠 Here are the ${localSortedProjects.length} properties as you requested`}
-                            </Badge>
-                          </div>
-                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6">
-                            {localSortedProjects.map((project: any) => {
-                              const isSaved = savedProjectIds.includes(project.project_id);
-                              return (
-                                <Card
-                                  key={project.project_id}
-                                  className="group relative border-0 rounded-lg sm:rounded-xl overflow-hidden shadow-sm sm:shadow-md bg-white hover:shadow-md sm:hover:shadow-lg transform transition-all duration-300 hover:scale-101 sm:hover:scale-103"
-                                >
-                                  <div className="absolute top-2 sm:top-3 right-2 sm:right-3 z-10">
-                                    <Badge className="bg-gradient-to-r from-green-500 to-emerald-500 text-white font-bold px-1 sm:px-2 py-0.5 sm:py-1 text-xs rounded-full shadow-sm sm:shadow-md">
-                                      {project.match?.similarity_percentage}% match
-                                    </Badge>
-                                  </div>
-
-                                  <div className="relative overflow-hidden">
-                                    <img
-                                      src={project.cover_image_url}
-                                      alt={project.project_title}
-                                      className="w-full h-40 sm:h-48 object-cover transition-transform duration-500 group-hover:scale-105"
-                                    />
-                                    <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent"></div>
-                                  </div>
-
-                                  <CardHeader className="p-3 sm:p-4 pb-1 sm:pb-2">
-                                    <CardTitle className="text-sm sm:text-base font-bold text-gray-800 line-clamp-2">
-                                      {project.project_title}
-                                    </CardTitle>
-                                    <p className="text-purple-600 font-semibold text-xs sm:text-sm">{project.developer_name}</p>
-                                    <div className="flex items-center gap-1 sm:gap-2 mt-0.5 sm:mt-1">
-                                      <Badge className="text-xs px-1 sm:px-2 py-0.5 sm:py-1 bg-gradient-to-r from-gray-600 to-gray-700 text-white capitalize rounded-full">
-                                        {project.source}
-                                      </Badge>
-                                      <Badge variant="outline" className="text-xs px-1 sm:px-2 py-0.5 sm:py-1 border-gray-300 text-gray-600 rounded-full">
-                                        {project.project_subtype}
-                                      </Badge>
-                                    </div>
-                                  </CardHeader>
-
-                                  <CardContent className="space-y-1 sm:space-y-2 text-xs sm:text-sm text-gray-700 px-3 sm:px-4 pb-3 sm:pb-4">
-                                    <div className="flex items-center gap-1 sm:gap-2 text-gray-600">
-                                      <MapPin className="h-3 w-3 sm:h-4 sm:w-4 text-red-500" />
-                                      <span className="font-medium text-xs sm:text-sm">{project.emirate || 'Unknown Location'}</span>
-                                    </div>
-                                    <div className="flex items-center gap-1 sm:gap-2 text-gray-600">
-                                      <DollarSign className="h-3 w-3 sm:h-4 sm:w-4 text-green-500" />
-                                      <span className="font-bold text-xs sm:text-sm text-green-600">
-                                        AED {project.starting_price_aed?.toLocaleString() || 'Price on request'}
-                                      </span>
-                                    </div>
-
-                                    {project.match?.content && (
-                                      <div className="bg-blue-50 p-2 sm:p-3 rounded-md border border-blue-100">
-                                        <p className="text-xs text-blue-800">
-                                          {project.match.content}
-                                        </p>
-                                      </div>
-                                    )}
-
-                                    <div className="flex gap-1 sm:gap-2 pt-2 sm:pt-3 items-center">
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => setSelectedProject(project)}
-                                        className="flex-1 border-gray-300 text-gray-700 hover:bg-blue-50 hover:border-blue-300 rounded-md sm:rounded-lg text-xs sm:text-sm transition-all duration-300"
-                                      >
-                                        <Eye className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" /> 
-                                        Details
-                                      </Button>
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        onClick={() => handleSaveToggle(project.project_id)}
-                                        className={`rounded-md sm:rounded-lg transition-all duration-300 ${
-                                          isSaved ? 'text-pink-600 bg-pink-50' : 'text-gray-400 hover:text-pink-600 hover:bg-pink-50'
-                                        }`}
-                                      >
-                                        {isSaved ? <BookmarkCheck className="h-4 w-4 sm:h-5 sm:w-5" /> : <Bookmark className="h-4 w-4 sm:h-5 sm:w-5" />}
-                                      </Button>
-                                    </div>
-
-                                    {project.source !== 'inhouse' && (
-                                      <a
-                                        href={project.url}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="text-xs text-blue-600 hover:text-blue-800 underline transition-colors duration-200 block"
-                                      >
-                                        View Original Listing ↗
-                                      </a>
-                                    )}
-                                  </CardContent>
-                                </Card>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      );
-                    })()
+{(() => {
+  const baseMessageId = typeof message.id === 'string' ? message.id.replace(/-(bot|user)$/,'') : (message.id as any);
+  const items = messageProjects[baseMessageId] || [];
+  if (message.message_type !== 'user' || items.length === 0) return null;
+  const localSortedProjects = items.slice().sort((a: any, b: any) => (b.match?.similarity_percentage || 0) - (a.match?.similarity_percentage || 0));
+  return (
+    <div className="mt-4 sm:mt-6">
+      <div className="mb-2 sm:mb-4 text-center">
+        <Badge className="bg-[#455560] text-white px-3 sm:px-4 py-1 sm:py-2 text-xs sm:text-sm">
+          {localSortedProjects.length === 1 ? "🏠 Here is the 1 property as you requested" : `🏠 Here are the ${localSortedProjects.length} properties as you requested`}
+        </Badge>
+      </div>
+      <motion.div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-8" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }}>
+        {localSortedProjects.map((project: any, index: number) => {
+          const isSaved = savedProjectIds.includes(project.project_id);
+          return (
+            <motion.div key={project.project_id} initial={{ opacity: 0, y: 50, scale: 0.9 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ duration: 0.6, delay: index * 0.1, type: "spring", stiffness: 100, damping: 15 }}>
+              <Card className="group relative border-0 rounded-xl sm:rounded-2xl overflow-hidden shadow-md sm:shadow-lg bg-white hover:shadow-xl sm:hover:shadow-2xl transform transition-all duration-500 hover:scale-102 sm:hover:scale-105">
+                <div className="absolute top-2 sm:top-4 right-2 sm:right-4 z-10">
+                  <Badge className="bg-gradient-to-r from-green-500 to-emerald-500 text-white font-bold px-2 sm:px-3 py-0.5 sm:py-1 text-[10px] sm:text-xs rounded-full shadow-md sm:shadow-lg">
+                    {project.match?.similarity_percentage}% match
+                  </Badge>
+                </div>
+                <div className="relative overflow-hidden">
+                  <img src={project.cover_image_url} alt={project.project_title} className="w-full h-40 sm:h-48 object-cover transition-transform duration-700 group-hover:scale-110" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent"></div>
+                </div>
+                <CardHeader className="p-3 sm:p-5 pb-2 sm:pb-3">
+                  <CardTitle className="text-base sm:text-lg font-bold text-gray-800 line-clamp-2">{project.project_title}</CardTitle>
+                  <p className="text-purple-600 font-semibold text-xs sm:text-sm">{project.developer_name}</p>
+                  <div className="flex items-center gap-1 sm:gap-2 mt-1 sm:mt-2">
+                    <Badge className="text-[10px] sm:text-xs px-2 sm:px-3 py-0.5 sm:py-1 bg-gradient-to-r from-gray-600 to-gray-700 text-white capitalize rounded-full">{project.source}</Badge>
+                    <Badge variant="outline" className="text-[10px] sm:text-xs px-2 sm:px-3 py-0.5 sm:py-1 border-gray-300 text-gray-600 rounded-full">{project.project_subtype}</Badge>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-2 sm:space-y-3 text-xs sm:text-sm text-gray-700 px-3 sm:px-5 pb-3 sm:pb-5">
+                  <div className="flex items-center gap-1 sm:gap-2 text-gray-600">
+                    <MapPin className="h-3 w-3 sm:h-4 sm:w-4 text-red-500" />
+                    <span className="font-medium text-xs sm:text-sm">{project.emirate || 'Unknown Location'}</span>
+                  </div>
+                  <div className="flex items-center gap-1 sm:gap-2 text-gray-600">
+                    <DollarSign className="h-3 w-3 sm:h-4 sm:w-4 text-green-500" />
+                    <span className="font-bold text-xs sm:text-sm text-green-600">AED {project.starting_price_aed?.toLocaleString() || 'Price on request'}</span>
+                  </div>
+                  {project.match?.content && (
+                    <div className="bg-blue-50 p-2 sm:p-3 rounded-lg border border-blue-100">
+                      <p className="text-[10px] sm:text-xs text-blue-800 line-clamp-3">
+                        <strong>AI Reasoning:</strong> {project.match.content}
+                      </p>
+                    </div>
                   )}
+                  <div className="flex gap-1 sm:gap-2 pt-2 sm:pt-3 items-center">
+                    <Button variant="outline" size="sm" onClick={() => setSelectedProject(project)} className="flex-1 border-gray-300 text-gray-700 hover:bg-blue-50 hover:border-blue-300 rounded-lg sm:rounded-xl text-xs sm:text-sm transition-all duration-300">
+                      <Eye className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                      Details
+                    </Button>
+                    <Button variant="ghost" size="icon" onClick={() => handleSaveToggle(project.project_id)} className={`rounded-lg sm:rounded-xl transition-all duration-300 ${savedProjectIds.includes(project.project_id) ? 'text-pink-600 bg-pink-50' : 'text-gray-400 hover:text-pink-600 hover:bg-pink-50'}`}>
+                      {savedProjectIds.includes(project.project_id) ? <BookmarkCheck className="h-4 w-4 sm:h-5 sm:w-5" /> : <Bookmark className="h-4 w-4 sm:h-5 sm:w-5" />}
+                    </Button>
+                  </div>
+                  <a href={project.url} target="_blank" rel="noopener noreferrer" className="text-[10px] sm:text-xs text-blue-600 hover:text-blue-800 underline transition-colors duration-200 block">
+                    View Original Listing ↗
+                  </a>
+                </CardContent>
+              </Card>
+            </motion.div>
+          );
+        })}
+      </motion.div>
+    </div>
+  );
+})()}
+
                 </div>
               ))}
 
               {isSending && (
                 <div className="flex justify-start">
-                  <div className="bg-white border border-gray-200 shadow-sm rounded-lg sm:rounded-xl px-3 sm:px-4 py-2 sm:py-3">
+                  <div className="bg-white border border-gray-200 shadow-sm rounded-xl sm:rounded-2xl px-4 sm:px-6 py-2 sm:py-4">
                     <div className="flex items-center gap-2 sm:gap-3">
                       <div className="w-6 h-6 sm:w-8 sm:h-8 bg-gray-100 rounded-full flex items-center justify-center">
                          <img 
@@ -970,18 +1439,41 @@ const formatMessageContent = (content: string) => {
           ) : (
             <div className="flex-1 flex items-center justify-center">
               <div className="text-center">
+                <Bot className="w-12 h-12 sm:w-16 sm:h-16 text-gray-300 mx-auto mb-2 sm:mb-4" />
+                <h2 className="text-lg sm:text-xl font-semibold text-gray-600 mb-2 sm:mb-4">Welcome to EkarBot</h2>
+                <p className="text-xs sm:text-sm text-gray-500 mb-4 sm:mb-6">Create a new chat to get started</p>
+                <Button onClick={createNewChatSession} className="bg-[#455560] text-white text-xs sm:text-sm">
+                  <Plus className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+                  Start New Chat
+                </Button>
               </div>
             </div>
           )}
         </div>
 
-          <ScrollToBottomButton scrollToBottom={scrollToBottom} isCollapsed={isCollapsed} />
+        <AnimatePresence>
+          {showScrollDown && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.8, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.8, y: 20 }}
+              transition={{ duration: 0.2 }}
+              className="fixed bottom-32 right-4 z-20"
+            >
+              <Button
+                className="bg-white hover:bg-gray-50 shadow-lg hover:shadow-xl rounded-full p-3 border border-gray-200 transition-all duration-200"
+                onClick={scrollToBottom}
+              >
+                <ArrowDown className="h-5 w-5 text-gray-600" />
+              </Button>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-
-        <div className={`fixed bottom-0 left-0 right-0 bg-gray-50 supports-[backdrop-filter]:bg-background/60 backdrop-blur p-2 sm:p-3 z-20 transition-all duration-300 ease-in-out ${isCollapsed ? 'lg:pl-16' : 'lg:pl-64'}`}>
+        <div className={`fixed bottom-0 left-0 right-0 bg-gray-50 supports-[backdrop-filter]:bg-background/60 backdrop-blur p-2 sm:p-4 z-10 transition-all duration-300 ease-in-out ${isCollapsed ? 'lg:pl-16' : 'lg:pl-64'}`}>
           {currentSessionId && (
-            <div className="max-w-3xl mx-auto">
-              <div className="flex items-center gap-1 sm:gap-2">
+            <div className="max-w-4xl mx-auto">
+              <div className="flex items-center gap-2 sm:gap-3">
                 <AnimatePresence>
                   {showModeSelector && (
                     <motion.div
@@ -995,10 +1487,10 @@ const formatMessageContent = (content: string) => {
                         damping: 20,
                       }}
                       ref={dropdownRef}
-                      className="absolute bottom-20 sm:bottom-24 left-100 -translate-x-1/2 w-[60vw] sm:w-72 bg-white rounded-md sm:rounded-lg shadow-lg sm:shadow-xl border border-gray-200 z-50"
+                      className="absolute bottom-20 sm:bottom-[105px] left-[320px] -translate-x-1/2 w-64 sm:w-72 bg-white rounded-lg sm:rounded-xl shadow-xl sm:shadow-2xl border border-gray-200 z-50"
                     >
                       <div className="p-2 sm:p-3">
-                        <div className="space-y-3 sm:space-y-4">
+                        <div className="space-y-3 sm:space-y-5">
                           {(Object.keys(chatModeConfig) as ChatMode[]).map((mode) => {
                             const config = chatModeConfig[mode];
                             const Icon = config.icon;
@@ -1008,14 +1500,14 @@ const formatMessageContent = (content: string) => {
                                 key={mode}
                                 variant="ghost"
                                 onClick={() => setChatMode(mode)}
-                                className={`w-full flex items-center gap-2 sm:gap-3 px-2 sm:px-3 py-1 sm:py-2 justify-start rounded-md transition-colors ${
+                                className={`w-full flex items-center gap-2 sm:gap-3 px-2 sm:px-3 py-1 sm:py-2 justify-start rounded-lg transition-colors ${
                                   isActive ? "bg-gray-100 text-gray-900" : "hover:bg-gray-50"
                                 }`}
                               >
                                 <Icon className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600" />
                                 <div className="text-left">
-                                  <div className="text-[12px] sm:text-[13px] font-medium">{config.label}</div>
-                                  <div className="text-[11px] sm:text-[12px] text-gray-500">{config.description}</div>
+                                  <div className="text-xs sm:text-sm font-medium">{config.label}</div>
+                                  <div className="text-[10px] sm:text-xs text-gray-500">{config.description}</div>
                                 </div>
                               </Button>
                             );
@@ -1024,12 +1516,12 @@ const formatMessageContent = (content: string) => {
 
                         {(chatMode === "property-listing" || chatMode === "ekarbot-ai") && (
                           <div className="mt-2 sm:mt-3 border-t pt-1 sm:pt-2">
-                            <div className="text-[12px] font-medium text-gray-500 mb-1 sm:mb-2 px-1">
+                            <div className="text-[10px] sm:text-xs font-medium text-gray-500 mb-1 sm:mb-2 px-2">
                               {chatMode === "property-listing"
                                 ? "Property Listing Mode"
                                 : "EkarBot AI Mode"}
                             </div>
-                            <div className="flex gap-1 sm:gap-2 px-1">
+                            <div className="flex gap-1 sm:gap-2 px-2">
                               <Button
                                 variant={
                                   chatMode === "property-listing"
@@ -1041,7 +1533,7 @@ const formatMessageContent = (content: string) => {
                                     : "outline"
                                 }
                                 size="sm"
-                                className="flex-1 text-[12px] py-1 sm:py-2 rounded-full"
+                                className="flex-1 text-[10px] sm:text-xs"
                                 onClick={() =>
                                   chatMode === "property-listing"
                                     ? setPropertyListingMode("inhouse")
@@ -1061,7 +1553,7 @@ const formatMessageContent = (content: string) => {
                                     : "outline"
                                 }
                                 size="sm"
-                                className="flex-1 text-[12px] py-1 sm:py-2 rounded-full"
+                                className="flex-1 text-[10px] sm:text-xs"
                                 onClick={() =>
                                   chatMode === "property-listing"
                                     ? setPropertyListingMode("external")
@@ -1074,10 +1566,10 @@ const formatMessageContent = (content: string) => {
                           </div>
                         )}
 
-                        <div className="mt-2 sm:mt-3 px-1">
+                        <div className="mt-2 sm:mt-4 px-2">
                           <Button
                             onClick={() => setShowModeSelector(false)}
-                            className="w-full from-[#455560] to-[#3a464f] hover:from-[#3a464f] hover:to-[#455560] text-white rounded-md text-[12px] sm:text-[13px] py-1 sm:py-2"
+                            className="w-full from-[#455560] to-[#3a464f] hover:from-[#3a464f] hover:to-[#455560] text-white rounded-lg text-[10px] sm:text-sm"
                           >
                             Apply Settings
                           </Button>
@@ -1087,92 +1579,51 @@ const formatMessageContent = (content: string) => {
                   )}
                 </AnimatePresence>
 
-                <div className="flex-1 flex items-center gap-1 sm:gap-2 bg-white border border-gray-300 rounded-full px-2 sm:px-3 py-1 sm:py-2">
+                <div className="flex-1 flex items-center gap-1 sm:gap-2 bg-white border border-gray-300 rounded-full px-2 sm:px-4 py-2 sm:py-3">
                   <motion.div
-  initial={{ scale: 1 }}
-  animate={{
-    scale: showModeSelector ? 1.1 : 1,
-  }}
-  transition={{ duration: 0.4, ease: "easeInOut" }} // slowed down
->
-  <Button
-    variant="ghost"
-    size="icon"
-    onClick={() => setShowModeSelector(!showModeSelector)}
-    className="shrink-0 rounded-full bg-gray-100 hover:bg-gray-200 w-8 h-8 sm:w-8 sm:h-8 relative overflow-hidden"
-  >
-    <AnimatePresence mode="wait" initial={false}>
-      {showModeSelector ? (
-        <motion.div
-          key="x"
-          initial={{ opacity: 0, rotate: -90, scale: 0.8 }}
-          animate={{ opacity: 1, rotate: 0, scale: 1 }}
-          exit={{ opacity: 0, rotate: 90, scale: 0.8 }}
-          transition={{ duration: 0.4, ease: "easeInOut" }}
-          className="absolute inset-0 flex items-center justify-center"
-        >
-          <X className="w-3 h-3 sm:w-4 sm:h-4" />
-        </motion.div>
-      ) : (
-        <motion.div
-          key="plus"
-          initial={{ opacity: 0, rotate: 90, scale: 0.8 }}
-          animate={{ opacity: 1, rotate: 0, scale: 1 }}
-          exit={{ opacity: 0, rotate: -90, scale: 0.8 }}
-          transition={{ duration: 0.4, ease: "easeInOut" }}
-          className="absolute inset-0 flex items-center justify-center"
-        >
-          <Plus className="w-3 h-3 sm:w-4 sm:h-4" />
-        </motion.div>
-      )}
-    </AnimatePresence>
-  </Button>
-</motion.div>
-
+                    initial={{ rotate: 0, scale: 1 }}
+                    animate={{
+                      rotate: showModeSelector ? 45 : 0,
+                      scale: showModeSelector ? 1.1 : 1,
+                    }}
+                    transition={{ duration: 0.3, ease: "easeInOut" }}
+                  >
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setShowModeSelector(!showModeSelector)}
+                      className="shrink-0 rounded-full bg-gray-100 hover:bg-gray-200 w-8 h-8 sm:w-10 sm:h-10"
+                    >
+                      <Plus className="w-3 h-3 sm:w-4 sm:h-4" />
+                    </Button>
+                  </motion.div>
 
                   <Input
-  value={chatPrompt}
-  onChange={(e) => setChatPrompt(e.target.value)}
-  onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleChatSubmit()}
-  placeholder={
-    chatMode === 'ekarbot-ai'
-      ? ekarBotMode === 'inhouse'
-        ? 'Ask about inhouse projects and CRM data...'
-        : 'Ask about external projects data...'
-      : chatMode === 'property-listing'
-      ? propertyListingMode === 'inhouse'
-        ? 'Ask about inhouse property listings...'
-        : 'Ask about external property listings...'
-      : chatModeConfig[chatMode]?.placeholder || 'Ask EkarBot anything...'
-  }
-  className="flex-1 border-0 focus-visible:ring-0 focus-visible:ring-offset-0 p-0 text-[12px] sm:text-[13px]"
-  disabled={isSending}
-/>
+                    value={chatPrompt}
+                    onChange={(e) => setChatPrompt(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleChatSubmit()}
+                    placeholder="Ask EkarBot anything..."
+                    className="flex-1 border-0 focus-visible:ring-0 focus-visible:ring-offset-0 p-0 text-[10px] sm:text-sm"
+                    disabled={isSending}
+                  />
 
                   <VoiceRecorder onVoiceMessage={handleVoiceMessage} disabled={isSending} />
 
                   <Button
-                   onClick={handleChatSubmit}
-                   disabled={!chatPrompt.trim() || isSending}
-                   className="bg-[#455560] text-white rounded-full h-8 w-8  flex items-center justify-center p-0 shadow-md"
+                    onClick={handleChatSubmit}
+                    disabled={!chatPrompt.trim() || isSending}
+                    className="bg-[#455560] text-white rounded-full h-8 w-8 sm:h-10 sm:w-10 flex items-center justify-center p-0 shadow-md"
                   >
-                   <ArrowUp className="w-3 h-3 sm:h-4 sm:w-4" />
+                    <ArrowUp className="w-3 h-3 sm:w-4 sm:h-4" />
                   </Button>
-
                 </div>
               </div>
 
               <div className="mt-1 sm:mt-2 text-center">
-                <span className="text-[12px] text-gray-500">
-                 Current mode: {chatModeConfig[chatMode].label}{" "}
-                               {chatMode === "property-listing"
-                               ? `(${propertyListingMode})`
-                               : chatMode === "ekarbot-ai"
-                               ? `(${ekarBotMode})`
-                              : ""}
+                <span className="text-[10px] sm:text-xs text-gray-500">
+                  Current mode: {chatModeConfig[chatMode].label}
                 </span>
               </div>
-
             </div>
           )}
         </div>
@@ -1185,6 +1636,28 @@ const formatMessageContent = (content: string) => {
           project={selectedProject}
         />
       )}
+
+      {/* Entity Detail Popups */}
+      <LeadDetailsPopup
+        leadId={selectedEntityId?.type === 'lead' ? selectedEntityId.id : ''}
+        open={selectedEntityId?.type === 'lead' || false}
+        onOpenChange={(open) => !open && setSelectedEntityId(null)}
+      />
+      <CustomerDetailsPopup
+        customerId={selectedEntityId?.type === 'customer' ? selectedEntityId.id : ''}
+        open={selectedEntityId?.type === 'customer' || false}
+        onOpenChange={(open) => !open && setSelectedEntityId(null)}
+      />
+      <ActivityDetailsPopup
+        activityId={selectedEntityId?.type === 'activity' ? selectedEntityId.id : ''}
+        open={selectedEntityId?.type === 'activity' || false}
+        onOpenChange={(open) => !open && setSelectedEntityId(null)}
+      />
+      <ProjectDetailsPopup
+        projectId={selectedEntityId?.type === 'project' ? selectedEntityId.id : ''}
+        open={selectedEntityId?.type === 'project' || false}
+        onClose={() => setSelectedEntityId(null)}
+      />
     </div>
   );
 };

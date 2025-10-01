@@ -7,6 +7,7 @@ import SalesAgentInbox from './SalesAgentInbox';
 import SalesAgentScheduleVisit from './SalesAgentScheduleVisit';
 import SalesAgentSavedProjects from './SalesAgentSavedProjects';
 import SalesAgentVisitsList from './SalesAgentVisitsList';
+import SalesAgentCRMLayout from './SalesAgentCRMLayout';
 import { useState, useEffect } from 'react';
 
 const SalesAgentApp = () => {
@@ -72,6 +73,8 @@ const SalesAgentApp = () => {
         return <SalesAgentScheduleVisit />;
       case 'visits-list':
         return <SalesAgentVisitsList />;
+      case 'crm-data':
+        return <SalesAgentCRMLayout />;
       default:
         return (
           <SalesAgentMainPage 
